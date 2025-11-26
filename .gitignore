@@ -2,3 +2,5 @@ venv
 .venv/
 __pycache__/
 *.pyc
+.env
+src/notifications/email_credential.json
