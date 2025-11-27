@@ -4,15 +4,15 @@ import hashlib
 from datetime import datetime
 import json
 
-# Pinecone
-from pinecone import Pinecone, ServerlessSpec
 
-# Embeddings
+from pinecone import Pinecone, ServerlessSpec
 from sentence_transformers import SentenceTransformer
 
-# Text processing
 import re
 from dataclasses import dataclass
+
+import os
+from dotenv import load_dotenv
 
 @dataclass
 class Document:
@@ -530,57 +530,48 @@ Answer:"""
 def example_usage():
     """Example usage of RAG Pipeline"""
     
-    # Load Pinecone API key from environment
-    import os
-    from dotenv import load_dotenv
+    # Load Pinecone API key, index name, and embedding model from environment
     load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
     pinecone_api_key = os.getenv('PINECONE_API_KEY')
+    pinecone_index_name = os.getenv('PINECONE_INDEX_NAME', 'rag-documents')
+    pinecone_embedding_model = os.getenv('PINECONE_EMBEDDING_MODEL', 'all-MiniLM-L6-v2')
 
     # Initialize
     rag = RAGPipeline(
         pinecone_api_key=pinecone_api_key,
-        index_name="my-rag-index",
-        embedding_model="all-MiniLM-L6-v2"
+        index_name=pinecone_index_name,
+        embedding_model=pinecone_embedding_model
     )
     
-    # Add documents
-    doc1 = """
-    Python is a high-level programming language. It was created by Guido van Rossum
-    and first released in 1991. Python emphasizes code readability and allows
-    programmers to express concepts in fewer lines of code.
+
+    chika_info = """
+    Chika Fujiwara (Kaguya-sama: Love is War)
+    Personality: A bubbly, energetic, and cheerful girl who is often the source of the series' comic relief. She is unpredictable, which constantly disrupts the schemes between Kaguya and Miyuki.
+    Role: The secretary of the Shuchi'in Academy's student council.
+    Skills: Despite her seemingly simple-minded nature, she is a talented pianist and can speak five languages.
+    Key trait: Her complete obliviousness to the intense mind games between Kaguya and Miyuki, which makes her an unpredictable factor.
+    Other notes: Her famous "Chika Dance" in the first season was noted for its realistic animation achieved through rotoscoping.
     """
-    
-    doc2 = """
-    Machine learning is a subset of artificial intelligence. It focuses on
-    building systems that can learn from data. Common algorithms include
-    neural networks, decision trees, and support vector machines.
-    """
-    
-    # Add single document
+
+    # Add Chika Fujiwara info as a document
     rag.add_document(
-        text=doc1,
-        metadata={'source': 'python_docs', 'category': 'programming'}
+        text=chika_info,
+        metadata={'source': 'character_bio', 'category': 'anime'}
     )
-    
-    # Add multiple documents
-    rag.add_documents_batch(
-        texts=[doc2],
-        metadatas=[{'source': 'ml_docs', 'category': 'ai'}]
-    )
-    
+
     # Retrieve relevant documents
-    query = "What is Python?"
+    query = "Who is Chika Fujiwara?"
     results = rag.retrieve(query, top_k=3)
-    
+
     for result in results:
         print(f"\nScore: {result.score:.3f}")
         print(f"Text: {result.text}")
         print(f"Metadata: {result.metadata}")
-    
+
     # Generate RAG context
     context = rag.generate_rag_context(query, top_k=2)
     print(f"\nRAG Context:\n{context}")
-    
+
     # Get index stats
     stats = rag.get_stats()
     print(f"\nIndex Stats: {stats}")

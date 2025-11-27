@@ -1,3 +1,5 @@
+# Ignore Gmail OAuth token file
+token.pickle
 venv
 .venv/
 __pycache__/

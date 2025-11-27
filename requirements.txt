@@ -13,3 +13,4 @@ ollama>=0.1.14
 duckduckgo-search>=4.0.0
 plyer>=2.1.0
 winsdk>=1.0.0b10; sys_platform == 'win32'
+fastapi-mcp>=0.3.6

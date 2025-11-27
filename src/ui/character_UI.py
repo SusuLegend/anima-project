@@ -19,6 +19,7 @@ How to run:
 import sys, json, random
 from pathlib import Path
 from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtWidgets import QDialog
 from PySide6.QtCore import QThread, Signal
 import math
 sys.path.append(str(Path(__file__).parent.parent.parent))
