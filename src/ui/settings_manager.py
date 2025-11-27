@@ -24,7 +24,7 @@ from PySide6.QtCore import Qt, Signal, QThread
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QComboBox, QSpinBox, QDoubleSpinBox,
-    QTextEdit, QFileDialog, QTabWidget, QGroupBox, QCheckBox, QMessageBox
+    QTextEdit, QFileDialog, QTabWidget, QGroupBox, QCheckBox, QMessageBox, QDialog
 )
 
 # Default configuration

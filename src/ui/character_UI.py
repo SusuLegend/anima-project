@@ -22,9 +22,10 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import QThread, Signal
 import math
 sys.path.append(str(Path(__file__).parent.parent.parent))
+homedir = Path(__file__).parent.parent.parent # Where the root of the project is
 from src.ai_brain.llm_integration import OllamaConversation
 
-CONFIG_PATH = Path(__file__).parent.parent.parent / "config.json"
+CONFIG_PATH = homedir / "config.json"
 def load_config():
     """Load configuration from config.json or use defaults"""
     default_config = {
@@ -74,7 +75,7 @@ def load_config():
 CONFIG = load_config()
 
 # ---------------------- Configuration ----------------------
-CHARACTER_GIF = str(Path(__file__).parent.parent.parent / "assets" / "expression1.gif")  # Use the anime GIF as the character
+CHARACTER_GIF = homedir / "assets" / "expression1.gif"  # Use the anime GIF as the character
 WANDER_INTERVAL_MS = 700
 WINDOW_OPACITY = 0.95
 MOVE_STEP = 12 # pixels per wander step
