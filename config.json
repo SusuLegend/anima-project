@@ -1,0 +1,30 @@
+{
+  "llm": {
+    "model": "llama3.2:latest",
+    "system_prompt": "You are a helpful, professional AI assistant. Provide clear, concise, and accurate responses to user queries.",
+    "timeout": 30.0
+  },
+  "ui": {
+    "character_gif": "D:/CAPSTONE/anima-project/assets/expression3.gif",
+    "window_opacity": 1.0,
+    "window_size": [
+      200,
+      200
+    ],
+    "move_step": 12,
+    "wander_interval_ms": 700
+  },
+  "rag": {
+    "enabled": false,
+    "pinecone_api_key": "",
+    "index_name": "rag-documents",
+    "embedding_model": "all-MiniLM-L6-v2",
+    "cloud": "aws",
+    "region": "us-east-1"
+  },
+  "notifications": {
+    "email_enabled": false,
+    "email_credential_path": "src/notifications/email_credential.json",
+    "poll_interval": 10
+  }
+}

@@ -25,6 +25,55 @@ import math
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from src.ai_brain.llm_integration import OllamaConversation
 
+CONFIG_PATH = Path(__file__).parent.parent.parent / "config.json"
+def load_config():
+    """Load configuration from config.json or use defaults"""
+    default_config = {
+        "llm": {
+            "model": "llama3.2:latest",
+            "system_prompt": "You are Chika Fujiwara from the anime 'Kaguya-sama: Love is War'. Always answer in a cute, bubbly, and playful manner, as if you are Chika. If asked about yourself, respond as Chika would.",
+            "timeout": 30.0
+        },
+        "ui": {
+            "character_gif": "assets/expression1.gif",
+            "window_opacity": 0.95,
+            "window_size": [200, 200],
+            "move_step": 12,
+            "wander_interval_ms": 700
+        },
+        "rag": {
+            "enabled": False,
+            "pinecone_api_key": "",
+            "index_name": "rag-documents",
+            "embedding_model": "all-MiniLM-L6-v2",
+            "cloud": "aws",
+            "region": "us-east-1"
+        },
+        "notifications": {
+            "email_enabled": False,
+            "email_credential_path": "src/notifications/email_credential.json",
+            "poll_interval": 10
+        }
+    }
+    
+    if CONFIG_PATH.exists():
+        try:
+            with open(CONFIG_PATH, 'r') as f:
+                config = json.load(f)
+                print("✅ Loaded configuration from config.json")
+                return config
+        except Exception as e:
+            print(f"⚠️ Error loading config: {e}")
+            print("Using default configuration")
+            return default_config
+    else:
+        print("⚠️ config.json not found, using default configuration")
+        print(f"Run settings_manager.py to create a configuration file")
+        return default_config
+
+# Load configuration
+CONFIG = load_config()
+
 # ---------------------- Configuration ----------------------
 CHARACTER_GIF = str(Path(__file__).parent.parent.parent / "assets" / "expression1.gif")  # Use the anime GIF as the character
 WANDER_INTERVAL_MS = 700
