@@ -16,8 +16,7 @@ How to run:
 - python floating_character.py
 """
 
-import sys
-import random
+import sys, json, random
 from pathlib import Path
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import QThread, Signal
