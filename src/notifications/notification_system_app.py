@@ -6,7 +6,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import os
 
-app = FastAPI(title="Notification API", description="Unified notification system for email (Gmail)")
+app = FastAPI(title="Notification API", 
+              description="Unified notification system for email (Gmail)",
+              lifespan=None)
 
 class EmailNotification(BaseModel):
     subject: str

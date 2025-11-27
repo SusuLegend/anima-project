@@ -10,3 +10,4 @@ fastapi>=0.101.0
 pinecone>=2.2.2
 sentence-transformers>=2.2.2
 ollama>=0.1.14
+ddgs>=4.0.0
