@@ -20,10 +20,12 @@ import sys
 import random
 from pathlib import Path
 from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtWidgets import QDialog
 from PySide6.QtCore import QThread, Signal
 import math
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from src.ai_brain.llm_integration import OllamaConversation
+from src.ai_brain.gemini_integration import GeminiIntegration
+import json
 
 CONFIG_PATH = Path(__file__).parent.parent.parent / "config.json"
 def load_config():
@@ -260,9 +262,9 @@ class FloatingCharacter(QtWidgets.QWidget):
             if text:
                 self.show_chat_message("Thinking...", duration_ms=1200)
                 QtWidgets.QApplication.processEvents()
-                # Use OllamaConversation for LLM response
+                # Use GeminiIntegration for LLM response with system prompt
                 if not hasattr(self, 'llm_convo'):
-                    self.llm_convo = OllamaConversation()
+                    self.llm_convo = GeminiIntegration(system_prompt=CONFIG["llm"].get("system_prompt"))
                 reply = self.llm_convo.get_response(text)
                 self._show_llm_reply(reply)
             self.dragging = True

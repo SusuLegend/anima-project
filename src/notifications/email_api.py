@@ -127,9 +127,13 @@ if __name__ == "__main__":
     print(f"Using credentials file: {credentials_path}")
     service = authenticate_gmail(credentials_path, token_path)
 
-    # Example: check emails every 60 seconds
+    # Example: check for new emails every 1 second
     import time
     while True:
-        list_unread_emails(service)
-        print("Waiting 60 seconds before checking again...")
-        time.sleep(60)
+        new_emails = get_new_email_subject_and_body(service)
+        if new_emails:
+            for email in new_emails:
+                print(f"From: {email['sender']}, Subject: {email['subject']}, Body: {email['body']}")
+        else:
+            print("No new messages.")
+        time.sleep(5)

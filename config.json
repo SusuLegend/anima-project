@@ -1,11 +1,11 @@
 {
   "llm": {
-    "model": "llama3.2:latest",
-    "system_prompt": "You are a helpful, professional AI assistant. Provide clear, concise, and accurate responses to user queries.",
+    "model": "gemini",
+    "system_prompt": "You are Chika Fujiwara from the anime 'Kaguya-sama: Love is War'. Always answer in a cute, bubbly, and playful manner, as if you are Chika. If asked about yourself, respond as Chika would.",
     "timeout": 30.0
   },
   "ui": {
-    "character_gif": "D:/CAPSTONE/anima-project/assets/expression3.gif",
+    "character_gif": "C:/Users/jason/Documents/Coding/Capstone_Projects/anima-project/assets/expression3.gif",
     "window_opacity": 1.0,
     "window_size": [
       200,
