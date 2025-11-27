@@ -14,3 +14,8 @@ duckduckgo-search>=4.0.0
 plyer>=2.1.0
 winsdk>=1.0.0b10; sys_platform == 'win32'
 fastapi-mcp>=0.3.6
+langchain>=0.1.0
+langchain-community>=0.0.20
+langchain-google-genai>=0.0.6
+langchain-pinecone>=0.0.1
+langchain-ollama>=0.1.0
