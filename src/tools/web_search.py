@@ -180,7 +180,7 @@ if __name__ == "__main__":
     searcher = WebSearcher()
     
     # Test search
-    test_query = "Python programming language"
+    test_query = "name of disney famous mouse"
     print(f"\nSearching for: {test_query}")
     print("\n" + searcher.search_formatted(test_query, max_results=3))
     

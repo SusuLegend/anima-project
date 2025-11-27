@@ -1,12 +1,15 @@
 """
 Read Notifications Tool
 
-This tool provides functionality to read email notifications from Gmail.
-It integrates with the existing email_api module to fetch unread emails.
+This tool provides functionality to read notifications from multiple sources:
+- Email notifications from Gmail
+- System notifications (Windows Action Center / macOS Notification Center)
 
 Requirements:
 - Google Gmail API authentication set up
 - email_credential.json in src/notifications/
+- For Windows system notifications: pip install winsdk
+- For sending notifications: pip install plyer
 """
 
 import sys
@@ -21,10 +24,17 @@ from src.notifications.email_api import (
     get_new_email_subject_and_body
 )
 
+# Import system notifications if available
+try:
+    from src.tools.system_notifications import SystemNotificationReader
+    SYSTEM_NOTIFICATIONS_AVAILABLE = True
+except ImportError:
+    SYSTEM_NOTIFICATIONS_AVAILABLE = False
+
 
 class NotificationReader:
     """
-    Reads notifications from various sources (primarily email).
+    Reads notifications from various sources (email and system).
     """
     
     def __init__(self, credentials_path: Optional[str] = None, token_path: str = "token.pickle"):
@@ -45,6 +55,11 @@ class NotificationReader:
         self.token_path = token_path
         self.service = None
         self._authenticated = False
+        
+        # Initialize system notification reader if available
+        self.system_reader = None
+        if SYSTEM_NOTIFICATIONS_AVAILABLE:
+            self.system_reader = SystemNotificationReader()
     
     def authenticate(self) -> bool:
         """
@@ -111,6 +126,25 @@ class NotificationReader:
         
         return "\n".join(summary_parts)
     
+    def get_system_notifications(self, limit: int = 10) -> List[Dict[str, str]]:
+        """
+        Get system notifications (Windows/macOS).
+        
+        Args:
+            limit: Maximum number of notifications to return
+        
+        Returns:
+            List of dicts with keys: 'title', 'body', 'app', 'timestamp'
+        """
+        if not SYSTEM_NOTIFICATIONS_AVAILABLE or not self.system_reader:
+            return []
+        
+        try:
+            return self.system_reader.get_notifications(limit)
+        except Exception as e:
+            print(f"Error fetching system notifications: {e}")
+            return []
+    
     def check_for_notifications(self) -> Dict[str, Any]:
         """
         Check for notifications from all sources.
@@ -119,26 +153,80 @@ class NotificationReader:
             Dict with notification counts and summaries
         """
         emails = self.get_unread_emails()
+        system_notifs = self.get_system_notifications(limit=5)
+        
+        # Build comprehensive summary
+        summary_parts = []
+        
+        # Email summary
+        if emails:
+            summary_parts.append(f"📧 {len(emails)} new email(s)")
+        
+        # System notification summary
+        if system_notifs and SYSTEM_NOTIFICATIONS_AVAILABLE:
+            summary_parts.append(f"🔔 {len(system_notifs)} system notification(s)")
+        
+        total_summary = ", ".join(summary_parts) if summary_parts else "No new notifications"
         
         return {
             'email_count': len(emails),
             'emails': emails,
-            'summary': self.get_email_summary()
+            'system_notification_count': len(system_notifs),
+            'system_notifications': system_notifs,
+            'total_count': len(emails) + len(system_notifs),
+            'summary': total_summary,
+            'detailed_summary': self._build_detailed_summary(emails, system_notifs)
         }
+    
+    def _build_detailed_summary(
+        self, 
+        emails: List[Dict[str, str]], 
+        system_notifs: List[Dict[str, str]]
+    ) -> str:
+        """Build detailed notification summary."""
+        parts = []
+        
+        # Email section
+        if emails:
+            parts.append(f"📧 EMAILS ({len(emails)}):")
+            for i, email in enumerate(emails[:5], 1):  # Limit to 5
+                sender = email.get('sender', 'Unknown')
+                subject = email.get('subject', 'No Subject')
+                parts.append(f"  {i}. From {sender}: {subject}")
+        
+        # System notification section
+        if system_notifs and SYSTEM_NOTIFICATIONS_AVAILABLE:
+            if parts:
+                parts.append("")  # Blank line
+            parts.append(f"🔔 SYSTEM NOTIFICATIONS ({len(system_notifs)}):")
+            for i, notif in enumerate(system_notifs[:5], 1):  # Limit to 5
+                app = notif.get('app', 'Unknown')
+                title = notif.get('title', 'No Title')
+                parts.append(f"  {i}. [{app}] {title}")
+        
+        if not parts:
+            return "No new notifications"
+        
+        return "\n".join(parts)
 
 
-def read_notifications(credentials_path: Optional[str] = None) -> str:
+def read_notifications(
+    credentials_path: Optional[str] = None,
+    include_system: bool = True
+) -> str:
     """
-    Simple function to read notifications and return a summary.
+    Simple function to read all notifications and return a summary.
     
     Args:
         credentials_path: Optional path to Gmail credentials
+        include_system: Include system notifications (Windows/macOS)
     
     Returns:
-        String summary of notifications
+        String summary of all notifications
     """
     reader = NotificationReader(credentials_path)
-    return reader.get_email_summary()
+    notifications = reader.check_for_notifications()
+    return notifications.get('detailed_summary', 'No notifications')
 
 
 # Example usage for testing
@@ -149,14 +237,9 @@ if __name__ == "__main__":
     
     reader = NotificationReader()
     
-    print("\nAuthenticating with Gmail...")
-    if reader.authenticate():
-        print("✅ Authentication successful")
-        
-        print("\nFetching notifications...")
-        notifications = reader.check_for_notifications()
-        
-        print(f"\n{notifications['summary']}")
-    else:
-        print("❌ Authentication failed")
-        print("Make sure email_credential.json exists in src/notifications/")
+    print("\n🔍 Checking all notification sources...")
+    notifications = reader.check_for_notifications()
+    
+    print(f"\n{notifications['summary']}")
+    print("\n" + "=" * 60)
+    print(notifications['detailed_summary'])
