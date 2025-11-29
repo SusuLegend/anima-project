@@ -120,3 +120,5 @@ Full milestone list is available in the project report.
 
 ---
 
+## Note
+Playwright install 

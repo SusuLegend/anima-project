@@ -16,8 +16,7 @@ How to run:
 - python floating_character.py
 """
 
-import sys
-import random
+import sys, json, random
 from pathlib import Path
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtWidgets import QDialog
@@ -25,7 +24,6 @@ from PySide6.QtCore import QThread, Signal
 import math
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from src.ai_brain.gemini_integration import GeminiIntegration
-import json
 
 CONFIG_PATH = Path(__file__).parent.parent.parent / "config.json"
 def load_config():
@@ -77,7 +75,8 @@ def load_config():
 CONFIG = load_config()
 
 # ---------------------- Configuration ----------------------
-CHARACTER_GIF = str(Path(__file__).parent.parent.parent / "assets" / "expression1.gif")  # Use the anime GIF as the character
+CHARACTER_GIF = str(Path(__file__).parent.parent.parent / CONFIG["ui"]["character_gif"])  # Use the path from config.json
+print("Character GIF path:", CHARACTER_GIF)
 WANDER_INTERVAL_MS = 700
 WINDOW_OPACITY = 0.95
 MOVE_STEP = 12 # pixels per wander step
@@ -232,15 +231,26 @@ class FloatingCharacter(QtWidgets.QWidget):
         layout.addWidget(self.char_label, alignment=QtCore.Qt.AlignHCenter)
 
         self.movie = None
+        print(f"Character GIF path: {CHARACTER_GIF}")
         if CHARACTER_GIF and Path(CHARACTER_GIF).exists():
+            print("GIF file exists.")
             try:
                 self.movie = QtGui.QMovie(CHARACTER_GIF)
                 if self.movie.isValid():
+                    print("QMovie loaded GIF successfully.")
                     self.movie.setScaledSize(QtCore.QSize(180, 180))
+                    self.movie.setCacheMode(QtGui.QMovie.CacheAll)
+                    self.movie.setSpeed(100)  # 100% speed
+                    # PySide6 QMovie does not support setLoopCount; it loops by default
                     self.char_label.setMovie(self.movie)
                     self.movie.start()
-            except Exception:
+                else:
+                    print("QMovie failed to load GIF: invalid format or corrupted file.")
+            except Exception as e:
+                print(f"Exception loading GIF: {e}")
                 self.movie = None
+        else:
+            print("GIF file does not exist at the specified path.")
 
         if not self.movie:
             pix = QtGui.QPixmap(self.char_label.size())

@@ -1,3 +1,7 @@
+# Ignore WhatsApp node_modules
+src/tools/whatsapp_listener/node_modules/
+# Ignore WhatsApp session data
+src/tools/sessions/
 # Ignore Gmail OAuth token file
 token.pickle
 venv
@@ -5,4 +9,16 @@ venv
 __pycache__/
 *.pyc
 .env
-src/notifications/email_credential.json
+src/tools/email_credential.json
+
+# Ignore Google and Microsoft credentials
+src/tools/google_listener/gcp_credential.json
+token.json
+src/tools/microsoft_listener/msal_token_cache.bin
+src/tools/whatsapp_listener/auth/
+
+# managed
+**.data.json
+**.node-persist**
+**_IGNORE_**
+# end managed

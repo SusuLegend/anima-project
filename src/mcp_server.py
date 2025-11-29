@@ -1,13 +1,31 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi_mcp import FastApiMCP 
 from database.rag_pipeline import RAGPipeline
 from ai_brain.gemini_integration import GeminiIntegration
-from notifications.email_api import authenticate_gmail, get_new_email_subject_and_body
+from tools.email_api import authenticate_gmail, get_new_email_subject_and_body
 import os
 from dotenv import load_dotenv
 
 
 api = FastAPI()
+
+# Import tools_app FastAPI app
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), "tools"))
+from tools.tools_app import app as tools_app
+
+# Mount tools_app under /tools
+api.mount("/tools", tools_app)
+
+api.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
 pinecone_api_key = os.getenv('PINECONE_API_KEY')
 pinecone_index_name = os.getenv('PINECONE_INDEX_NAME', 'rag-documents')

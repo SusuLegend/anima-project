@@ -1,3 +1,7 @@
+# FastAPI integration function
+def get_gmail_data():
+    # TODO: Replace with actual Gmail API logic
+    return {"status": "success", "data": "Gmail data placeholder"}
 import base64
 from email.mime.text import MIMEText
 import os
@@ -121,12 +125,12 @@ def reply_to_email(service, to_email, subject, body, thread_id=None):
 
 if __name__ == "__main__":
     # Use email_credential.json in the current directory by default
-    credentials_path = os.path.join(os.path.dirname(__file__), "email_credential.json")
+    credentials_path = os.path.join(os.path.dirname(__file__), "gcp_credential.json")
     token_path = "token.pickle"  # This will store OAuth tokens for this user
 
     print(f"Using credentials file: {credentials_path}")
     service = authenticate_gmail(credentials_path, token_path)
-
+    
     # Example: check for new emails every 1 second
     import time
     while True:
