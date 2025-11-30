@@ -173,11 +173,14 @@ class FloatingCharacter(QtWidgets.QWidget):
         self.setWindowOpacity(WINDOW_OPACITY)
 
         self.setFixedSize(200, 200)
-        self.dragging = True
+        self.dragging = False  # Changed from True
+        self.move_mode = False  # NEW
         # Initialize velocity to zero; wander timer will set direction later
         self.last_mouse_pos = None
         self.vx = 0
         self.vy = 0
+        self.menu_visible = False  # NEW
+        self.menu_buttons = []  # NEW
 
         self._build_ui()
 
@@ -266,20 +269,123 @@ class FloatingCharacter(QtWidgets.QWidget):
         self.setLayout(layout)
 
     # ---------- Interaction & Movement ----------
+    def _create_circular_menu(self):
+        """Create circular menu buttons around the character"""
+        if self.menu_visible:
+            self._hide_circular_menu()
+            return
+        
+        self.menu_visible = True
+        center_x, center_y = 100, 100  # Center of the 200x200 widget
+        radius = 110
+        
+        # Define buttons: (angle_degrees, label, icon_text, callback)
+        buttons_config = [
+            (0, "Prompt", "💬", self._on_prompt_click),
+            (120, "Move", "✋", self._on_move_click),
+            (240, "Settings", "⚙️", self._on_settings_click),
+        ]
+        
+        for angle, label, icon, callback in buttons_config:
+            btn = QtWidgets.QPushButton(icon, self)
+            btn.setFixedSize(50, 50)
+            btn.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                                stop:0 #4a90e2, stop:1 #357abd);
+                    border: 3px solid white;
+                    border-radius: 25px;
+                    color: white;
+                    font-size: 20px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                                stop:0 #5ba3ff, stop:1 #4a90e2);
+                    border: 3px solid #ffe082;
+                }
+                QPushButton:pressed {
+                    background: #2d5f8d;
+                }
+            """)
+            btn.setToolTip(label)
+            btn.clicked.connect(callback)
+            
+            # Calculate position
+            angle_rad = math.radians(angle - 90)  # -90 to start from top
+            x = center_x + radius * math.cos(angle_rad) - 25  # -25 to center button
+            y = center_y + radius * math.sin(angle_rad) - 25
+            
+            btn.move(int(x), int(y))
+            btn.show()
+            btn.raise_()
+            self.menu_buttons.append(btn)
+
+    def _hide_circular_menu(self):
+        """Hide and remove circular menu buttons"""
+        for btn in self.menu_buttons:
+            btn.deleteLater()
+        self.menu_buttons.clear()
+        self.menu_visible = False
+
+    def _on_prompt_click(self):
+        """Handle prompt button click"""
+        self._hide_circular_menu()
+        text = self.show_question_dialog()
+        if text:
+            self.show_chat_message("Thinking...", duration_ms=1200)
+            QtWidgets.QApplication.processEvents()
+            if not hasattr(self, 'llm_convo'):
+                self.llm_convo = GeminiIntegration(system_prompt=CONFIG["llm"].get("system_prompt"))
+            reply = self.llm_convo.get_response(text)
+            self._show_llm_reply(reply)
+
+    def _on_move_click(self):
+        """Toggle move mode"""
+        self.move_mode = not self.move_mode
+        self._hide_circular_menu()
+        if self.move_mode:
+            self.show_chat_message("Move mode ON - Click and drag me!", duration_ms=2000)
+            self.setCursor(QtCore.Qt.OpenHandCursor)
+        else:
+            self.show_chat_message("Move mode OFF", duration_ms=2000)
+            self.unsetCursor()
+
+    def _on_settings_click(self):
+        """Open settings manager"""
+        self._hide_circular_menu()
+        import subprocess
+        settings_path = Path(__file__).parent.parent.parent / "settings_manager.py"
+        if settings_path.exists():
+            try:
+                subprocess.Popen([sys.executable, str(settings_path)])
+                self.show_chat_message("Opening settings...", duration_ms=2000)
+            except Exception as e:
+                self.show_chat_message(f"Error: {e}", duration_ms=3000)
+        else:
+            self.show_chat_message("Settings manager not found!", duration_ms=3000)
+        
     def mousePressEvent(self, event: QtGui.QMouseEvent):
         if event.button() == QtCore.Qt.LeftButton:
-            text = self.show_question_dialog()
-            if text:
-                self.show_chat_message("Thinking...", duration_ms=1200)
-                QtWidgets.QApplication.processEvents()
-                # Use GeminiIntegration for LLM response with system prompt
-                if not hasattr(self, 'llm_convo'):
-                    self.llm_convo = GeminiIntegration(system_prompt=CONFIG["llm"].get("system_prompt"))
-                reply = self.llm_convo.get_response(text)
-                self._show_llm_reply(reply)
+            # Check if clicking on a menu button
+            if self.menu_visible:
+                for btn in self.menu_buttons:
+                    if btn.geometry().contains(event.pos()):
+                        return  # Let button handle the click
+                # Clicked outside menu - hide it
+                self._hide_circular_menu()
+                return
+        
+        # Check if in move mode
+        if self.move_mode:
             self.dragging = True
             self.last_mouse_pos = event.globalPosition().toPoint()
-            event.accept()
+            self.setCursor(QtCore.Qt.ClosedHandCursor)
+        else:
+            # Show circular menu
+            self._create_circular_menu()
+        
+        event.accept()
 
     def _show_llm_reply(self, reply):
         self.show_chat_message(reply)
@@ -293,12 +399,15 @@ class FloatingCharacter(QtWidgets.QWidget):
             event.accept()
 
     def mouseReleaseEvent(self, event: QtGui.QMouseEvent):
-        self.dragging = False
-        self.last_mouse_pos = None
-        event.accept()
+        if self.dragging:  # Added check
+            self.dragging = False
+            self.last_mouse_pos = None
+            if self.move_mode:  # NEW
+                self.setCursor(QtCore.Qt.OpenHandCursor)  # NEW
+            event.accept()
 
     def _wander_step(self):
-        if self.dragging or not self.isVisible():
+        if self.dragging or not self.isVisible() or self.move_mode or self.menu_visible:  # Added "or self.move_mode or self.menu_visible"
             return
         geom = QtWidgets.QApplication.primaryScreen().availableGeometry()
         x, y = self.x(), self.y()
