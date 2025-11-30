@@ -5,8 +5,6 @@ This module provides a comprehensive settings interface where users can:
 - Configure LLM model settings (Ollama model, system prompt)
 - Select character assets (GIF files)
 - Adjust UI behavior (opacity, movement speed, wander interval)
-- Configure RAG pipeline settings (Pinecone)
-- Set up email notifications
 - Save/load settings to/from JSON
 - Launch the application with configured settings
 
@@ -40,19 +38,6 @@ DEFAULT_CONFIG = {
         "window_size": [200, 200],
         "move_step": 12,
         "wander_interval_ms": 700
-    },
-    "rag": {
-        "enabled": False,
-        "pinecone_api_key": "",
-        "index_name": "rag-documents",
-        "embedding_model": "all-MiniLM-L6-v2",
-        "cloud": "aws",
-        "region": "us-east-1"
-    },
-    "notifications": {
-        "email_enabled": False,
-        "email_credential_path": "src/notifications/email_credential.json",
-        "poll_interval": 10
     }
 }
 
@@ -87,8 +72,6 @@ class SettingsManager(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.addTab(self.create_llm_tab(), "🤖 LLM Model")
         self.tabs.addTab(self.create_ui_tab(), "🎨 Character & UI")
-        self.tabs.addTab(self.create_rag_tab(), "📚 RAG Pipeline")
-        self.tabs.addTab(self.create_notifications_tab(), "📧 Notifications")
         main_layout.addWidget(self.tabs)
         
         # Bottom buttons
@@ -291,143 +274,6 @@ class SettingsManager(QMainWindow):
         layout.addStretch()
         return tab
         
-    def create_rag_tab(self):
-        """Create RAG pipeline settings tab"""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        
-        # Enable RAG
-        self.rag_enabled = QCheckBox("Enable RAG (Retrieval Augmented Generation)")
-        self.rag_enabled.setChecked(self.config["rag"]["enabled"])
-        self.rag_enabled.stateChanged.connect(self.toggle_rag_settings)
-        layout.addWidget(self.rag_enabled)
-        
-        # RAG settings group
-        self.rag_group = QGroupBox("Pinecone Configuration")
-        rag_layout = QVBoxLayout()
-        
-        api_key_row = QHBoxLayout()
-        api_key_row.addWidget(QLabel("Pinecone API Key:"))
-        self.pinecone_key_input = QLineEdit(self.config["rag"]["pinecone_api_key"])
-        self.pinecone_key_input.setEchoMode(QLineEdit.Password)
-        api_key_row.addWidget(self.pinecone_key_input)
-        show_key_btn = QPushButton("👁️")
-        show_key_btn.setMaximumWidth(40)
-        show_key_btn.clicked.connect(lambda: self.pinecone_key_input.setEchoMode(
-            QLineEdit.Normal if self.pinecone_key_input.echoMode() == QLineEdit.Password else QLineEdit.Password
-        ))
-        api_key_row.addWidget(show_key_btn)
-        rag_layout.addLayout(api_key_row)
-        
-        index_row = QHBoxLayout()
-        index_row.addWidget(QLabel("Index Name:"))
-        self.index_name_input = QLineEdit(self.config["rag"]["index_name"])
-        index_row.addWidget(self.index_name_input)
-        rag_layout.addLayout(index_row)
-        
-        model_row = QHBoxLayout()
-        model_row.addWidget(QLabel("Embedding Model:"))
-        self.embedding_model_input = QComboBox()
-        self.embedding_model_input.addItems([
-            "all-MiniLM-L6-v2",
-            "all-mpnet-base-v2",
-            "paraphrase-MiniLM-L6-v2"
-        ])
-        self.embedding_model_input.setCurrentText(self.config["rag"]["embedding_model"])
-        model_row.addWidget(self.embedding_model_input)
-        model_row.addStretch()
-        rag_layout.addLayout(model_row)
-        
-        cloud_row = QHBoxLayout()
-        cloud_row.addWidget(QLabel("Cloud Provider:"))
-        self.cloud_input = QComboBox()
-        self.cloud_input.addItems(["aws", "gcp", "azure"])
-        self.cloud_input.setCurrentText(self.config["rag"]["cloud"])
-        cloud_row.addWidget(self.cloud_input)
-        
-        cloud_row.addWidget(QLabel("Region:"))
-        self.region_input = QLineEdit(self.config["rag"]["region"])
-        cloud_row.addWidget(self.region_input)
-        rag_layout.addLayout(cloud_row)
-        
-        self.rag_group.setLayout(rag_layout)
-        self.rag_group.setEnabled(self.config["rag"]["enabled"])
-        layout.addWidget(self.rag_group)
-        
-        # Info label
-        info = QLabel(
-            "ℹ️ RAG allows the assistant to retrieve relevant information from documents.\n"
-            "You'll need a Pinecone account and API key to use this feature."
-        )
-        info.setWordWrap(True)
-        info.setStyleSheet("color: #666; padding: 10px;")
-        layout.addWidget(info)
-        
-        layout.addStretch()
-        return tab
-        
-    def create_notifications_tab(self):
-        """Create notifications settings tab"""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        
-        # Enable email notifications
-        self.email_enabled = QCheckBox("Enable Email Notifications (Gmail)")
-        self.email_enabled.setChecked(self.config["notifications"]["email_enabled"])
-        self.email_enabled.stateChanged.connect(self.toggle_email_settings)
-        layout.addWidget(self.email_enabled)
-        
-        # Email settings group
-        self.email_group = QGroupBox("Gmail Configuration")
-        email_layout = QVBoxLayout()
-        
-        credential_row = QHBoxLayout()
-        credential_row.addWidget(QLabel("Credentials File:"))
-        self.email_credential_input = QLineEdit(self.config["notifications"]["email_credential_path"])
-        credential_row.addWidget(self.email_credential_input)
-        
-        browse_cred_btn = QPushButton("Browse...")
-        browse_cred_btn.clicked.connect(self.browse_email_credential)
-        credential_row.addWidget(browse_cred_btn)
-        email_layout.addLayout(credential_row)
-        
-        poll_row = QHBoxLayout()
-        poll_row.addWidget(QLabel("Poll Interval (seconds):"))
-        self.poll_interval_input = QSpinBox()
-        self.poll_interval_input.setRange(5, 300)
-        self.poll_interval_input.setValue(self.config["notifications"]["poll_interval"])
-        poll_row.addWidget(self.poll_interval_input)
-        poll_row.addStretch()
-        email_layout.addLayout(poll_row)
-        
-        self.email_group.setLayout(email_layout)
-        self.email_group.setEnabled(self.config["notifications"]["email_enabled"])
-        layout.addWidget(self.email_group)
-        
-        # Setup instructions
-        instructions = QLabel(
-            "📝 Setup Instructions:\n"
-            "1. Create a Google Cloud project\n"
-            "2. Enable Gmail API\n"
-            "3. Download OAuth 2.0 credentials as JSON\n"
-            "4. Select the credentials file above\n"
-            "5. First run will open browser for authentication"
-        )
-        instructions.setWordWrap(True)
-        instructions.setStyleSheet("color: #666; padding: 10px;")
-        layout.addWidget(instructions)
-        
-        layout.addStretch()
-        return tab
-        
-    def toggle_rag_settings(self, state):
-        """Enable/disable RAG settings based on checkbox"""
-        self.rag_group.setEnabled(state == Qt.Checked)
-        
-    def toggle_email_settings(self, state):
-        """Enable/disable email settings based on checkbox"""
-        self.email_group.setEnabled(state == Qt.Checked)
-        
     def browse_character_gif(self):
         """Browse for character GIF file"""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -438,17 +284,6 @@ class SettingsManager(QMainWindow):
         )
         if file_path:
             self.asset_input.setText(file_path)
-            
-    def browse_email_credential(self):
-        """Browse for email credential JSON file"""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select Email Credential File",
-            str(Path(__file__).parent.parent / "notifications"),
-            "JSON Files (*.json);;All Files (*.*)"
-        )
-        if file_path:
-            self.email_credential_input.setText(file_path)
             
     def preview_asset(self):
         """Preview the selected character asset"""
@@ -486,19 +321,6 @@ class SettingsManager(QMainWindow):
                 "window_size": [self.width_input.value(), self.height_input.value()],
                 "move_step": self.step_input.value(),
                 "wander_interval_ms": self.interval_input.value()
-            },
-            "rag": {
-                "enabled": self.rag_enabled.isChecked(),
-                "pinecone_api_key": self.pinecone_key_input.text(),
-                "index_name": self.index_name_input.text(),
-                "embedding_model": self.embedding_model_input.currentText(),
-                "cloud": self.cloud_input.currentText(),
-                "region": self.region_input.text()
-            },
-            "notifications": {
-                "email_enabled": self.email_enabled.isChecked(),
-                "email_credential_path": self.email_credential_input.text(),
-                "poll_interval": self.poll_interval_input.value()
             }
         }
         
@@ -555,19 +377,6 @@ class SettingsManager(QMainWindow):
         self.step_input.setValue(self.config["ui"]["move_step"])
         self.interval_input.setValue(self.config["ui"]["wander_interval_ms"])
         
-        # RAG tab
-        self.rag_enabled.setChecked(self.config["rag"]["enabled"])
-        self.pinecone_key_input.setText(self.config["rag"]["pinecone_api_key"])
-        self.index_name_input.setText(self.config["rag"]["index_name"])
-        self.embedding_model_input.setCurrentText(self.config["rag"]["embedding_model"])
-        self.cloud_input.setCurrentText(self.config["rag"]["cloud"])
-        self.region_input.setText(self.config["rag"]["region"])
-        
-        # Notifications tab
-        self.email_enabled.setChecked(self.config["notifications"]["email_enabled"])
-        self.email_credential_input.setText(self.config["notifications"]["email_credential_path"])
-        self.poll_interval_input.setValue(self.config["notifications"]["poll_interval"])
-        
     def reset_to_defaults(self):
         """Reset all settings to defaults"""
         reply = QMessageBox.question(
@@ -592,24 +401,6 @@ class SettingsManager(QMainWindow):
                 f"Character GIF not found:\n{asset_path}\n\nPlease select a valid file."
             )
             return
-            
-        if self.rag_enabled.isChecked() and not self.pinecone_key_input.text():
-            QMessageBox.warning(
-                self,
-                "Missing API Key",
-                "RAG is enabled but Pinecone API key is not set.\n\nPlease provide an API key or disable RAG."
-            )
-            return
-            
-        if self.email_enabled.isChecked():
-            email_cred_path = Path(self.email_credential_input.text())
-            if not email_cred_path.exists():
-                QMessageBox.warning(
-                    self,
-                    "Missing Credentials",
-                    f"Email credential file not found:\n{email_cred_path}\n\nPlease select a valid file or disable email notifications."
-                )
-                return
         
         # Save settings
         self.save_settings()
