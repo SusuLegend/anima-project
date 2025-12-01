@@ -5,8 +5,9 @@ This module provides a comprehensive settings interface where users can:
 - Configure LLM model settings (Ollama model, system prompt)
 - Select character assets (GIF files)
 - Adjust UI behavior (opacity, movement speed, wander interval)
+- Authenticate various services (Connectivity tab)
 - Save/load settings to/from JSON
-- Launch the application with configured settings
+- Launch and stop the application with configured settings
 
 Requirements:
 - PySide6
@@ -16,6 +17,7 @@ Requirements:
 import sys
 import json
 import os
+import psutil
 from pathlib import Path
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Qt, Signal, QThread
@@ -38,6 +40,13 @@ DEFAULT_CONFIG = {
         "window_size": [200, 200],
         "move_step": 12,
         "wander_interval_ms": 700
+    },
+    "connectivity": {
+        "google_authenticated": False,
+        "outlook_authenticated": False,
+        "slack_authenticated": False,
+        "github_authenticated": False,
+        "dropbox_authenticated": False
     }
 }
 
@@ -50,6 +59,7 @@ class SettingsManager(QMainWindow):
     def __init__(self):
         super().__init__()
         self.config = self.load_config()
+        self.running_process = None
         self.init_ui()
         
     def init_ui(self):
@@ -72,6 +82,7 @@ class SettingsManager(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.addTab(self.create_llm_tab(), "🤖 LLM Model")
         self.tabs.addTab(self.create_ui_tab(), "🎨 Character & UI")
+        self.tabs.addTab(self.create_connectivity_tab(), "🔗 Connectivity")
         main_layout.addWidget(self.tabs)
         
         # Bottom buttons
@@ -100,11 +111,24 @@ class SettingsManager(QMainWindow):
         """)
         self.start_btn.clicked.connect(self.start_application)
         
+        self.stop_btn = QPushButton("⏹️ STOP APPLICATION")
+        self.stop_btn.setStyleSheet("""
+            padding: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            background-color: #f44336;
+            color: white;
+            border-radius: 8px;
+        """)
+        self.stop_btn.clicked.connect(self.stop_application)
+        self.stop_btn.setEnabled(False)
+        
         button_layout.addWidget(self.save_btn)
         button_layout.addWidget(self.load_btn)
         button_layout.addWidget(self.reset_btn)
         button_layout.addStretch()
         button_layout.addWidget(self.start_btn)
+        button_layout.addWidget(self.stop_btn)
         
         main_layout.addLayout(button_layout)
         
@@ -273,6 +297,145 @@ class SettingsManager(QMainWindow):
         
         layout.addStretch()
         return tab
+    
+    def create_connectivity_tab(self):
+        """Create connectivity and authentication tab"""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        
+        # Introduction
+        intro_label = QLabel(
+            "Connect your accounts to enable additional features.\n"
+            "These integrations will be configured in future updates."
+        )
+        intro_label.setStyleSheet("padding: 10px; background-color: #e3f2fd; border-radius: 4px;")
+        intro_label.setWordWrap(True)
+        layout.addWidget(intro_label)
+        
+        # Google Services
+        google_group = QGroupBox("Google Services")
+        google_layout = QVBoxLayout()
+        
+        google_drive_row = QHBoxLayout()
+        google_drive_btn = QPushButton("🔐 Authenticate Google Drive")
+        google_drive_btn.clicked.connect(lambda: self.authenticate_service("Google Drive"))
+        google_drive_row.addWidget(google_drive_btn)
+        self.google_drive_status = QLabel("❌ Not Connected")
+        google_drive_row.addWidget(self.google_drive_status)
+        google_drive_row.addStretch()
+        google_layout.addLayout(google_drive_row)
+        
+        gmail_row = QHBoxLayout()
+        gmail_btn = QPushButton("🔐 Authenticate Gmail")
+        gmail_btn.clicked.connect(lambda: self.authenticate_service("Gmail"))
+        gmail_row.addWidget(gmail_btn)
+        self.gmail_status = QLabel("❌ Not Connected")
+        gmail_row.addWidget(self.gmail_status)
+        gmail_row.addStretch()
+        google_layout.addLayout(gmail_row)
+        
+        google_group.setLayout(google_layout)
+        layout.addWidget(google_group)
+        
+        # Microsoft Services
+        microsoft_group = QGroupBox("Microsoft Services")
+        microsoft_layout = QVBoxLayout()
+        
+        outlook_row = QHBoxLayout()
+        outlook_btn = QPushButton("🔐 Authenticate Outlook")
+        outlook_btn.clicked.connect(lambda: self.authenticate_service("Outlook"))
+        outlook_row.addWidget(outlook_btn)
+        self.outlook_status = QLabel("❌ Not Connected")
+        outlook_row.addWidget(self.outlook_status)
+        outlook_row.addStretch()
+        microsoft_layout.addLayout(outlook_row)
+        
+        onedrive_row = QHBoxLayout()
+        onedrive_btn = QPushButton("🔐 Authenticate OneDrive")
+        onedrive_btn.clicked.connect(lambda: self.authenticate_service("OneDrive"))
+        onedrive_row.addWidget(onedrive_btn)
+        self.onedrive_status = QLabel("❌ Not Connected")
+        onedrive_row.addWidget(self.onedrive_status)
+        onedrive_row.addStretch()
+        microsoft_layout.addLayout(onedrive_row)
+        
+        microsoft_group.setLayout(microsoft_layout)
+        layout.addWidget(microsoft_group)
+        
+        # Other Services
+        other_group = QGroupBox("Other Services")
+        other_layout = QVBoxLayout()
+        
+        slack_row = QHBoxLayout()
+        slack_btn = QPushButton("🔐 Authenticate Slack")
+        slack_btn.clicked.connect(lambda: self.authenticate_service("Slack"))
+        slack_row.addWidget(slack_btn)
+        self.slack_status = QLabel("❌ Not Connected")
+        slack_row.addWidget(self.slack_status)
+        slack_row.addStretch()
+        other_layout.addLayout(slack_row)
+        
+        github_row = QHBoxLayout()
+        github_btn = QPushButton("🔐 Authenticate GitHub")
+        github_btn.clicked.connect(lambda: self.authenticate_service("GitHub"))
+        github_row.addWidget(github_btn)
+        self.github_status = QLabel("❌ Not Connected")
+        github_row.addWidget(self.github_status)
+        github_row.addStretch()
+        other_layout.addLayout(github_row)
+        
+        dropbox_row = QHBoxLayout()
+        dropbox_btn = QPushButton("🔐 Authenticate Dropbox")
+        dropbox_btn.clicked.connect(lambda: self.authenticate_service("Dropbox"))
+        dropbox_row.addWidget(dropbox_btn)
+        self.dropbox_status = QLabel("❌ Not Connected")
+        dropbox_row.addWidget(self.dropbox_status)
+        dropbox_row.addStretch()
+        other_layout.addLayout(dropbox_row)
+        
+        other_group.setLayout(other_layout)
+        layout.addWidget(other_group)
+        
+        # Disconnect all button
+        disconnect_all_btn = QPushButton("🔓 Disconnect All Services")
+        disconnect_all_btn.setStyleSheet("background-color: #ffebee; padding: 8px;")
+        disconnect_all_btn.clicked.connect(self.disconnect_all_services)
+        layout.addWidget(disconnect_all_btn)
+        
+        layout.addStretch()
+        return tab
+    
+    def authenticate_service(self, service_name):
+        """Placeholder function for service authentication"""
+        QMessageBox.information(
+            self,
+            "Coming Soon",
+            f"{service_name} authentication will be implemented in a future update.\n\n"
+            f"This button is a placeholder for the authentication flow."
+        )
+        # Update status label as a placeholder
+        # In actual implementation, this would be set after successful auth
+        
+    def disconnect_all_services(self):
+        """Disconnect all authenticated services"""
+        reply = QMessageBox.question(
+            self,
+            "Disconnect All Services",
+            "Are you sure you want to disconnect all authenticated services?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            # Reset all status labels
+            self.google_drive_status.setText("❌ Not Connected")
+            self.gmail_status.setText("❌ Not Connected")
+            self.outlook_status.setText("❌ Not Connected")
+            self.onedrive_status.setText("❌ Not Connected")
+            self.slack_status.setText("❌ Not Connected")
+            self.github_status.setText("❌ Not Connected")
+            self.dropbox_status.setText("❌ Not Connected")
+            
+            self.statusBar().showMessage("🔓 All services disconnected", 3000)
+            QMessageBox.information(self, "Disconnected", "All services have been disconnected.")
         
     def browse_character_gif(self):
         """Browse for character GIF file"""
@@ -340,7 +503,12 @@ class SettingsManager(QMainWindow):
         if CONFIG_PATH.exists():
             try:
                 with open(CONFIG_PATH, 'r') as f:
-                    return json.load(f)
+                    config = json.load(f)
+                    # Merge with defaults to ensure all keys exist
+                    for key in DEFAULT_CONFIG:
+                        if key not in config:
+                            config[key] = DEFAULT_CONFIG[key]
+                    return config
             except Exception as e:
                 print(f"Error loading config: {e}")
         return DEFAULT_CONFIG.copy()
@@ -409,7 +577,11 @@ class SettingsManager(QMainWindow):
         try:
             import subprocess
             main_script = Path(__file__).parent / "character_UI.py"
-            subprocess.Popen([sys.executable, str(main_script)])
+            self.running_process = subprocess.Popen([sys.executable, str(main_script)])
+            
+            # Enable stop button, disable start button
+            self.start_btn.setEnabled(False)
+            self.stop_btn.setEnabled(True)
             
             self.statusBar().showMessage("✅ Application launched!", 2000)
             QMessageBox.information(
@@ -423,6 +595,64 @@ class SettingsManager(QMainWindow):
                 "Launch Error",
                 f"Failed to start application:\n{e}"
             )
+    
+    def stop_application(self):
+        """Stop the running application by terminating the process"""
+        reply = QMessageBox.question(
+            self,
+            "Stop Application",
+            "Are you sure you want to stop the AI Virtual Assistant?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            try:
+                stopped = False
+                
+                # Try to terminate the process if we have a reference
+                if self.running_process:
+                    self.running_process.terminate()
+                    try:
+                        self.running_process.wait(timeout=3)
+                        stopped = True
+                    except subprocess.TimeoutExpired:
+                        self.running_process.kill()
+                        stopped = True
+                    self.running_process = None
+                
+                # Also try to find and kill any character_UI.py processes
+                current_pid = os.getpid()
+                for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                    try:
+                        cmdline = proc.info.get('cmdline')
+                        if cmdline and any('character_UI.py' in str(arg) for arg in cmdline):
+                            if proc.info['pid'] != current_pid:
+                                proc.terminate()
+                                proc.wait(timeout=3)
+                                stopped = True
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
+                        pass
+                
+                # Re-enable start button, disable stop button
+                self.start_btn.setEnabled(True)
+                self.stop_btn.setEnabled(False)
+                
+                if stopped:
+                    self.statusBar().showMessage("⏹️ Application stopped successfully", 3000)
+                    QMessageBox.information(
+                        self,
+                        "Application Stopped",
+                        "The AI Virtual Assistant has been stopped."
+                    )
+                else:
+                    self.statusBar().showMessage("⚠️ No running application found", 3000)
+                    
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Stop Error",
+                    f"Failed to stop application:\n{e}"
+                )
 
 
 def main():
