@@ -82,8 +82,147 @@ WINDOW_OPACITY = 0.95
 MOVE_STEP = 12 # pixels per wander step
 # -----------------------------------------------------------
 
+class SpeechBubble(QtWidgets.QWidget):
+    """Custom manga-style speech bubble widget"""
+    def __init__(self, parent, message, duration_ms=8000):
+        super().__init__(parent)
+        self.parent_widget = parent
+        self.message = message
+        self.duration_ms = duration_ms
+        
+        # Window setup
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Tool | QtCore.Qt.WindowStaysOnTopHint)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        
+        # Calculate dimensions based on parent (GIF is 180x180)
+        max_bubble_height = 90  # Half of 180
+        max_bubble_width = 450
+        min_bubble_width = 160
+        
+        # Padding values
+        horizontal_padding = 30
+        vertical_padding = 20
+        
+        # Create text label to measure size
+        self.text_label = QtWidgets.QLabel(message)
+        self.text_label.setWordWrap(True)
+        self.text_label.setAlignment(QtCore.Qt.AlignCenter)  # Center text
+        self.text_label.setStyleSheet("""
+            QLabel {
+                background: transparent;
+                color: #222;
+                font-size: 15px;
+                font-weight: bold;
+                padding: 0px;
+            }
+        """)
+        
+        # Calculate appropriate width based on text length
+        font_metrics = self.text_label.fontMetrics()
+        text_width = font_metrics.horizontalAdvance(message)
+        
+        # Determine bubble width (adjustable based on message length)
+        # For short messages, use a compact width
+        if text_width < min_bubble_width - (horizontal_padding * 2):
+            bubble_width = text_width + (horizontal_padding * 2)
+            bubble_width = max(bubble_width, min_bubble_width)  # Ensure minimum
+        elif text_width > max_bubble_width - (horizontal_padding * 2):
+            bubble_width = max_bubble_width
+        else:
+            bubble_width = text_width + (horizontal_padding * 2)
+            
+        # Set label width for proper word wrap
+        self.text_label.setMaximumWidth(bubble_width - (horizontal_padding * 2))
+        self.text_label.setMinimumWidth(bubble_width - (horizontal_padding * 2))
+        self.text_label.adjustSize()
+        
+        # Calculate height based on wrapped text
+        text_height = self.text_label.sizeHint().height()
+        bubble_height = text_height + (vertical_padding * 2)
+        
+        # Cap at max height, but remove the cap if text is short
+        if bubble_height > max_bubble_height:
+            bubble_height = max_bubble_height
+            # Enable scrolling for very long text by adjusting label
+            self.text_label.setMaximumHeight(max_bubble_height - (vertical_padding * 2))
+        
+        # Tail properties
+        self.tail_height = 20
+        
+        # Set widget size
+        self.setFixedSize(bubble_width, bubble_height + self.tail_height)
+        
+        # Layout for text - centered both horizontally and vertically
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(horizontal_padding, vertical_padding, horizontal_padding, vertical_padding + self.tail_height)
+        layout.setAlignment(QtCore.Qt.AlignCenter)
+        layout.addWidget(self.text_label, alignment=QtCore.Qt.AlignCenter)
+        
+    def paintEvent(self, event):
+        """Draw the manga-style speech bubble"""
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        
+        # Bubble dimensions
+        bubble_rect = QtCore.QRectF(0, 0, self.width(), self.height() - self.tail_height)
+        
+        # Create path for bubble with tail
+        path = QtGui.QPainterPath()
+        
+        # Main bubble (rounded rectangle)
+        path.addRoundedRect(bubble_rect, 15, 15)
+        
+        # Tail (pointing down to character)
+        tail_start_x = self.width() / 2 - 15
+        tail_tip_x = self.width() / 2
+        tail_end_x = self.width() / 2 + 15
+        tail_start_y = self.height() - self.tail_height
+        tail_tip_y = self.height()
+        
+        tail = QtGui.QPainterPath()
+        tail.moveTo(tail_start_x, tail_start_y)
+        tail.lineTo(tail_tip_x, tail_tip_y)
+        tail.lineTo(tail_end_x, tail_start_y)
+        tail.closeSubpath()
+        
+        path.addPath(tail)
+        
+        # Draw white fill with black outline (classic manga style)
+        painter.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0), 3))  # Black outline
+        painter.setBrush(QtGui.QBrush(QtGui.QColor(255, 255, 255)))  # White fill
+        painter.drawPath(path)
+        
+        # Optional: Add inner shadow effect for depth
+        shadow_pen = QtGui.QPen(QtGui.QColor(200, 200, 200), 1)
+        painter.setPen(shadow_pen)
+        inner_rect = bubble_rect.adjusted(2, 2, -2, -2)
+        painter.drawRoundedRect(inner_rect, 13, 13)
+        
+    def show_bubble(self):
+        """Position and show the speech bubble above the character"""
+        # Position above the character
+        global_pos = self.parent_widget.mapToGlobal(self.parent_widget.rect().center())
+        x = global_pos.x() - self.width() // 2
+        y = global_pos.y() - self.parent_widget.height() // 2 - self.height() - 5
+        
+        # Clamp to screen bounds
+        screen_geom = QtWidgets.QApplication.primaryScreen().availableGeometry()
+        x = max(screen_geom.left(), min(x, screen_geom.right() - self.width()))
+        y = max(screen_geom.top(), y)
+        
+        self.move(x, y)
+        self.show()
+        
+        # Auto-close after duration
+        QtCore.QTimer.singleShot(self.duration_ms, self.close)
+
 class FloatingCharacter(QtWidgets.QWidget):
     def show_chat_message(self, message, duration_ms=8000):
+        """Show message in a manga-style speech bubble"""
+        dialog = SpeechBubble(self, message, duration_ms)
+        dialog.show_bubble()
+
+    def show_question_dialog(self):
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Tool)
         dialog.setAttribute(QtCore.Qt.WA_TranslucentBackground)
@@ -96,41 +235,6 @@ class FloatingCharacter(QtWidgets.QWidget):
                 color: #222;
                 font-size: 16px;
                 border: 2px solid #b2f2a5;
-                min-width: 220px;
-                max-width: 420px;
-            }
-        """)
-        layout = QtWidgets.QVBoxLayout(dialog)
-        layout.setContentsMargins(10, 10, 10, 10)
-        label = QtWidgets.QLabel(message)
-        label.setWordWrap(True)
-        layout.addWidget(label)
-        dialog.adjustSize()
-        # Always position above the character, even if window moves
-        char_geom = self.geometry()
-        global_pos = self.mapToGlobal(self.rect().center())
-        x = global_pos.x() - dialog.width() // 2
-        y = global_pos.y() - self.height() // 2 - dialog.height() - 8
-        # Clamp to top of screen if needed
-        screen_geom = QtWidgets.QApplication.primaryScreen().availableGeometry()
-        y = max(screen_geom.top(), y)
-        dialog.move(x, y)
-        QtCore.QTimer.singleShot(duration_ms, dialog.accept)
-        dialog.exec()
-
-    def show_question_dialog(self):
-        dialog = QtWidgets.QDialog(self)
-        dialog.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Tool)
-        dialog.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        dialog.setStyleSheet("""
-            QDialog { background: transparent; }
-            QLabel {
-                background: #c7e7ff;
-                border-radius: 16px;
-                padding: 12px 18px;
-                color: #222;
-                font-size: 16px;
-                border: 2px solid #a5d8f2;
                 min-width: 220px;
                 max-width: 420px;
             }
@@ -173,14 +277,13 @@ class FloatingCharacter(QtWidgets.QWidget):
         self.setWindowOpacity(WINDOW_OPACITY)
 
         self.setFixedSize(200, 200)
-        self.dragging = False  # Changed from True
-        self.move_mode = False  # NEW
-        # Initialize velocity to zero; wander timer will set direction later
+        self.dragging = False
+        self.move_mode = False
         self.last_mouse_pos = None
         self.vx = 0
         self.vy = 0
-        self.menu_visible = False  # NEW
-        self.menu_buttons = []  # NEW
+        self.menu_visible = False
+        self.menu_buttons = []
 
         self._build_ui()
 
@@ -243,8 +346,7 @@ class FloatingCharacter(QtWidgets.QWidget):
                     print("QMovie loaded GIF successfully.")
                     self.movie.setScaledSize(QtCore.QSize(180, 180))
                     self.movie.setCacheMode(QtGui.QMovie.CacheAll)
-                    self.movie.setSpeed(100)  # 100% speed
-                    # PySide6 QMovie does not support setLoopCount; it loops by default
+                    self.movie.setSpeed(100)
                     self.char_label.setMovie(self.movie)
                     self.movie.start()
                 else:
@@ -270,14 +372,17 @@ class FloatingCharacter(QtWidgets.QWidget):
 
     # ---------- Interaction & Movement ----------
     def _create_circular_menu(self):
-        """Create circular menu buttons around the character"""
+        """Create circular menu buttons around the character as separate top-level widgets"""
         if self.menu_visible:
             self._hide_circular_menu()
             return
         
         self.menu_visible = True
-        center_x, center_y = 100, 100  # Center of the 200x200 widget
-        radius = 110
+        
+        # Get the center position of the character window in global coordinates
+        global_center = self.mapToGlobal(self.rect().center())
+        center_x, center_y = global_center.x(), global_center.y()
+        radius = 130  # Distance from character center
         
         # Define buttons: (angle_degrees, label, icon_text, callback)
         buttons_config = [
@@ -287,16 +392,19 @@ class FloatingCharacter(QtWidgets.QWidget):
         ]
         
         for angle, label, icon, callback in buttons_config:
-            btn = QtWidgets.QPushButton(icon, self)
-            btn.setFixedSize(50, 50)
+            # Create as a top-level widget
+            btn = QtWidgets.QPushButton(icon)
+            btn.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Tool)
+            btn.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+            btn.setFixedSize(60, 60)
             btn.setStyleSheet("""
                 QPushButton {
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                                                 stop:0 #4a90e2, stop:1 #357abd);
                     border: 3px solid white;
-                    border-radius: 25px;
+                    border-radius: 30px;
                     color: white;
-                    font-size: 20px;
+                    font-size: 24px;
                     font-weight: bold;
                 }
                 QPushButton:hover {
@@ -311,19 +419,19 @@ class FloatingCharacter(QtWidgets.QWidget):
             btn.setToolTip(label)
             btn.clicked.connect(callback)
             
-            # Calculate position
+            # Calculate position in global coordinates
             angle_rad = math.radians(angle - 90)  # -90 to start from top
-            x = center_x + radius * math.cos(angle_rad) - 25  # -25 to center button
-            y = center_y + radius * math.sin(angle_rad) - 25
+            x = center_x + radius * math.cos(angle_rad) - 30  # -30 to center button (half of 60)
+            y = center_y + radius * math.sin(angle_rad) - 30
             
             btn.move(int(x), int(y))
             btn.show()
-            btn.raise_()
             self.menu_buttons.append(btn)
 
     def _hide_circular_menu(self):
         """Hide and remove circular menu buttons"""
         for btn in self.menu_buttons:
+            btn.close()
             btn.deleteLater()
         self.menu_buttons.clear()
         self.menu_visible = False
@@ -341,49 +449,52 @@ class FloatingCharacter(QtWidgets.QWidget):
             self._show_llm_reply(reply)
 
     def _on_move_click(self):
-        """Toggle move mode"""
-        self.move_mode = not self.move_mode
+        """Activate move mode"""
         self._hide_circular_menu()
-        if self.move_mode:
+        
+        if not self.move_mode:
+            # Enable move mode
+            self.move_mode = True
             self.show_chat_message("Move mode ON - Click and drag me!", duration_ms=2000)
             self.setCursor(QtCore.Qt.OpenHandCursor)
-        else:
-            self.show_chat_message("Move mode OFF", duration_ms=2000)
-            self.unsetCursor()
 
     def _on_settings_click(self):
         """Open settings manager"""
         self._hide_circular_menu()
         import subprocess
-        settings_path = Path(__file__).parent.parent.parent / "settings_manager.py"
+        
+        # Fix the settings path - go to src/ui/settings_manager.py
+        settings_path = Path(__file__).parent / "settings_manager.py"
+        
+        print(f"Looking for settings manager at: {settings_path}")
+        print(f"File exists: {settings_path.exists()}")
+        
         if settings_path.exists():
             try:
                 subprocess.Popen([sys.executable, str(settings_path)])
                 self.show_chat_message("Opening settings...", duration_ms=2000)
             except Exception as e:
                 self.show_chat_message(f"Error: {e}", duration_ms=3000)
+                print(f"Error launching settings: {e}")
         else:
             self.show_chat_message("Settings manager not found!", duration_ms=3000)
+            print(f"Settings manager not found at: {settings_path}")
         
     def mousePressEvent(self, event: QtGui.QMouseEvent):
         if event.button() == QtCore.Qt.LeftButton:
-            # Check if clicking on a menu button
+            # If menu is visible, clicking anywhere hides it
             if self.menu_visible:
-                for btn in self.menu_buttons:
-                    if btn.geometry().contains(event.pos()):
-                        return  # Let button handle the click
-                # Clicked outside menu - hide it
                 self._hide_circular_menu()
                 return
         
-        # Check if in move mode
-        if self.move_mode:
-            self.dragging = True
-            self.last_mouse_pos = event.globalPosition().toPoint()
-            self.setCursor(QtCore.Qt.ClosedHandCursor)
-        else:
-            # Show circular menu
-            self._create_circular_menu()
+            # Check if in move mode
+            if self.move_mode:
+                self.dragging = True
+                self.last_mouse_pos = event.globalPosition().toPoint()
+                self.setCursor(QtCore.Qt.ClosedHandCursor)
+            else:
+                # Show circular menu
+                self._create_circular_menu()
         
         event.accept()
 
@@ -399,23 +510,37 @@ class FloatingCharacter(QtWidgets.QWidget):
             event.accept()
 
     def mouseReleaseEvent(self, event: QtGui.QMouseEvent):
-        if self.dragging:  # Added check
+        if self.dragging:
             self.dragging = False
             self.last_mouse_pos = None
-            if self.move_mode:  # NEW
-                self.setCursor(QtCore.Qt.OpenHandCursor)  # NEW
+            
+            if self.move_mode:
+                # Ask if user wants to disable move mode after dragging
+                reply = QtWidgets.QMessageBox.question(
+                    self,
+                    "Move Mode",
+                    "Are you done moving? Disable move mode?",
+                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+                )
+                if reply == QtWidgets.QMessageBox.Yes:
+                    self.move_mode = False
+                    self.show_chat_message("Move mode OFF", duration_ms=2000)
+                    self.unsetCursor()
+                else:
+                    # Keep move mode active
+                    self.setCursor(QtCore.Qt.OpenHandCursor)
             event.accept()
 
     def _wander_step(self):
-        if self.dragging or not self.isVisible() or self.move_mode or self.menu_visible:  # Added "or self.move_mode or self.menu_visible"
+        if self.dragging or not self.isVisible() or self.move_mode or self.menu_visible:
             return
         geom = QtWidgets.QApplication.primaryScreen().availableGeometry()
         x, y = self.x(), self.y()
 
         # More frequent and visible randomization
-        if random.random() < 0.6:  # Increase chance to change direction
+        if random.random() < 0.6:
             ang = random.uniform(0, 2 * math.pi)
-            speed = random.uniform(0.7, 1.5) * MOVE_STEP  # More visible step
+            speed = random.uniform(0.7, 1.5) * MOVE_STEP
             self.vx = int(speed * math.cos(ang))
             self.vy = int(speed * math.sin(ang))
         # Occasionally stop or reverse
