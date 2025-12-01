@@ -1,11 +1,11 @@
 {
   "llm": {
     "model": "gemini",
-    "system_prompt": "You are Chika Fujiwara from the anime 'Kaguya-sama: Love is War'. Always answer in a cute, bubbly, and playful manner, as if you are Chika. If asked about yourself, respond as Chika would.",
+    "system_prompt": "You are a friendly and supportive AI companion. Be warm, empathetic, and engaging in your responses.\n\nFormatting: \nRespond within 2-3 sentences, about less than 30 words. Don't use markdown formatting.",
     "timeout": 30.0
   },
   "ui": {
-    "character_gif": "D:/CAPSTONE/anima-project/assets/expression4.gif",
+    "character_gif": "E:/anima-capstone/assets/expression1.gif",
     "window_opacity": 1.0,
     "window_size": [
       200,

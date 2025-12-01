@@ -9,19 +9,32 @@ async function whatsapp_calling_message() {
 
     const sock = makeWASocket({
         auth: state,
-        // Do not use printQRInTerminal
+        logger: Pino({ level: 'silent' }) // Reduce log spam
     });
 
     sock.ev.on("connection.update", (update) => {
-        const { qr } = update
+        const { qr, connection, lastDisconnect } = update
+        
         if (qr) {
+            console.log('Scan this QR code:')
             qrcode.generate(qr, { small: true })
         }
-        if (update.connection === 'close') {
-            const shouldReconnect = (update.lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut
+        
+        if (connection === 'close') {
+            const shouldReconnect = (lastDisconnect?.error instanceof Boom)
+                ? lastDisconnect.error.output?.statusCode !== DisconnectReason.loggedOut
+                : true
+            
+            console.log('Connection closed. Reason:', lastDisconnect?.error?.message)
+            
             if (shouldReconnect) {
-                start() // restart your connection logic
+                console.log('Reconnecting in 5 seconds...')
+                setTimeout(() => whatsapp_calling_message(), 5000) // Fixed: use correct function name
+            } else {
+                console.log('Logged out. Please delete auth folder and scan QR again.')
             }
+        } else if (connection === 'open') {
+            console.log('✅ Connected successfully!')
         }
     })
 
