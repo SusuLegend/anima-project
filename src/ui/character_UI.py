@@ -40,6 +40,7 @@ def load_config():
         "ui": {
             "character_gif": "assets/expression1.gif",
             "window_opacity": 0.95,
+            "size_mode": "Fixed Size",
             "window_size": [200, 200],
             "move_step": 12,
             "wander_interval_ms": 700
@@ -83,6 +84,8 @@ print("Character GIF path:", CHARACTER_GIF)
 WANDER_INTERVAL_MS = 700
 WINDOW_OPACITY = 0.95
 MOVE_STEP = 12 # pixels per wander step
+SIZE_MODE = CONFIG["ui"].get("size_mode", "Fixed Size")
+CONFIG_WINDOW_W, CONFIG_WINDOW_H = CONFIG["ui"].get("window_size", [200, 200])
 # -----------------------------------------------------------
 class QuestionBubble(QtWidgets.QDialog):
     """Interactive question input speech bubble"""
@@ -625,7 +628,8 @@ class FloatingCharacter(QtWidgets.QWidget):
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.setWindowOpacity(WINDOW_OPACITY)
 
-        self.setFixedSize(200, 200)
+        # Will be adjusted by size mode later
+        self.setFixedSize(CONFIG_WINDOW_W, CONFIG_WINDOW_H)
         self.dragging = False
         self.move_mode = False
         self.last_mouse_pos = None
@@ -681,11 +685,11 @@ class FloatingCharacter(QtWidgets.QWidget):
         layout.setSpacing(6)
 
         self.char_label = QtWidgets.QLabel()
-        self.char_label.setFixedSize(180, 180)
         self.char_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.char_label, alignment=QtCore.Qt.AlignHCenter)
 
         self.movie = None
+        self._applied_first_frame = False
         print(f"Character GIF path: {CHARACTER_GIF}")
         if CHARACTER_GIF and Path(CHARACTER_GIF).exists():
             print("GIF file exists.")
@@ -693,10 +697,16 @@ class FloatingCharacter(QtWidgets.QWidget):
                 self.movie = QtGui.QMovie(CHARACTER_GIF)
                 if self.movie.isValid():
                     print("QMovie loaded GIF successfully.")
-                    self.movie.setScaledSize(QtCore.QSize(180, 180))
+                    # Defer scaled size to _apply_size_mode once we know frame size
                     self.movie.setCacheMode(QtGui.QMovie.CacheAll)
                     self.movie.setSpeed(100)
                     self.char_label.setMovie(self.movie)
+                    # Try to apply size immediately if frameRect is known
+                    self._apply_size_mode()
+                    # Ensure we apply once the first frame is available
+                    self.movie.frameChanged.connect(self._on_first_frame)
+                    # Also re-apply after a short delay to catch metadata readiness
+                    QtCore.QTimer.singleShot(250, self._apply_size_mode)
                     self.movie.start()
                 else:
                     print("QMovie failed to load GIF: invalid format or corrupted file.")
@@ -707,17 +717,123 @@ class FloatingCharacter(QtWidgets.QWidget):
             print("GIF file does not exist at the specified path.")
 
         if not self.movie:
-            pix = QtGui.QPixmap(self.char_label.size())
+            # Create placeholder pixmap respecting size mode
+            self._apply_size_mode()
+            label_size = self.char_label.size()
+            if label_size.width() <= 0 or label_size.height() <= 0:
+                margins = self.layout().contentsMargins() if self.layout() else QtCore.QMargins(0, 0, 0, 0)
+                pad_w = margins.left() + margins.right()
+                pad_h = margins.top() + margins.bottom()
+                label_size = QtCore.QSize(max(CONFIG_WINDOW_W - pad_w, 50), max(CONFIG_WINDOW_H - pad_h, 50))
+            pix = QtGui.QPixmap(label_size)
             pix.fill(QtCore.Qt.transparent)
             p = QtGui.QPainter(pix)
             p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
             p.setBrush(QtGui.QBrush(QtGui.QColor(255, 200, 0)))
             p.setPen(QtGui.QPen(QtGui.QColor(150, 70, 0)))
-            p.drawEllipse(10, 10, 160, 160)
+            d = min(label_size.width(), label_size.height()) - 20
+            d = max(d, 20)
+            p.drawEllipse(10, 10, d, d)
             p.end()
             self.char_label.setPixmap(pix)
 
         self.setLayout(layout)
+
+    def showEvent(self, event: QtGui.QShowEvent) -> None:
+        # Re-apply size mode after the widget is shown to ensure final geometry
+        try:
+            self._apply_size_mode()
+        except Exception as e:
+            print(f"showEvent sizing error: {e}")
+        return super().showEvent(event)
+
+    def _on_first_frame(self, _index: int):
+        if not self._applied_first_frame:
+            self._apply_size_mode()
+            self._applied_first_frame = True
+            try:
+                self.movie.frameChanged.disconnect(self._on_first_frame)
+            except Exception:
+                pass
+
+    def _apply_size_mode(self):
+        """Apply size mode (Fixed Size, Fit Width, Fit Height) to window, label, and movie."""
+        # Determine original GIF size robustly
+        orig_w, orig_h = self._gif_intrinsic_size()
+        if orig_w <= 0 or orig_h <= 0:
+            # Fallback to configured size if unknown
+            orig_w, orig_h = max(CONFIG_WINDOW_W, 1), max(CONFIG_WINDOW_H, 1)
+
+        mode = SIZE_MODE
+        # Compute padding from layout margins
+        margins = self.layout().contentsMargins() if self.layout() else QtCore.QMargins(0, 0, 0, 0)
+        pad_w = margins.left() + margins.right()
+        pad_h = margins.top() + margins.bottom()
+        if mode == "Fixed Size":
+            win_w, win_h = CONFIG_WINDOW_W, CONFIG_WINDOW_H
+            label_w = max(win_w - pad_w, 10)
+            label_h = max(win_h - pad_h, 10)
+        elif mode == "Fit Width":
+            # Width controls, derive height from aspect ratio
+            label_w = max(CONFIG_WINDOW_W - pad_w, 10)
+            label_h = max(int(orig_h * (label_w / orig_w)), 10)
+            win_w = label_w + pad_w
+            win_h = label_h + pad_h
+        elif mode == "Fit Height":
+            # Height controls, derive width from aspect ratio
+            label_h = max(CONFIG_WINDOW_H - pad_h, 10)
+            label_w = max(int(orig_w * (label_h / orig_h)), 10)
+            win_w = label_w + pad_w
+            win_h = label_h + pad_h
+        else:
+            # Fallback to fixed if unknown
+            win_w, win_h = CONFIG_WINDOW_W, CONFIG_WINDOW_H
+            label_w = max(win_w - pad_w, 10)
+            label_h = max(win_h - pad_h, 10)
+
+        # Apply sizes
+        try:
+            self.setFixedSize(win_w, win_h)
+            self.char_label.setFixedSize(label_w, label_h)
+            if self.movie and self.movie.isValid():
+                self.movie.setScaledSize(QtCore.QSize(label_w, label_h))
+        except Exception as e:
+            print(f"Error applying size mode: {e}")
+
+    def _gif_intrinsic_size(self):
+        """Try multiple ways to determine the GIF's intrinsic frame size."""
+        try:
+            if self.movie:
+                rect = self.movie.frameRect()
+                if rect.width() > 0 and rect.height() > 0:
+                    return rect.width(), rect.height()
+                # Try current image or pixmap
+                img = self.movie.currentImage()
+                if not img.isNull():
+                    return img.width(), img.height()
+                pm = self.movie.currentPixmap()
+                if not pm.isNull():
+                    return pm.width(), pm.height()
+            # Try reading metadata directly
+            reader = QtGui.QImageReader(CHARACTER_GIF)
+            size = reader.size()
+            if size.isValid():
+                return size.width(), size.height()
+            # As a last resort, parse GIF header (logical screen size)
+            try:
+                with open(CHARACTER_GIF, 'rb') as f:
+                    header = f.read(10)
+                    # GIF Header: 6 bytes signature + 2 bytes width + 2 bytes height (little endian)
+                    if len(header) >= 10 and header[:3] == b'GIF':
+                        w = int.from_bytes(header[6:8], 'little')
+                        h = int.from_bytes(header[8:10], 'little')
+                        if w > 0 and h > 0:
+                            return w, h
+            except Exception:
+                pass
+        except Exception:
+            pass
+        return 0, 0
 
     # ---------- Interaction & Movement ----------
     def _create_circular_menu(self):

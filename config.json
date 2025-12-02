@@ -5,11 +5,12 @@
     "timeout": 30.0
   },
   "ui": {
-    "character_gif": "C:/Users/jason/Documents/Coding/Capstone_Projects/anima-project/assets/expression6.gif",
+    "character_gif": "E:/anima-capstone/assets/expression2.gif",
     "window_opacity": 1.0,
+    "size_mode": "Fit Height",
     "window_size": [
-      200,
-      200
+      250,
+      250
     ],
     "move_step": 20,
     "wander_interval_ms": 700

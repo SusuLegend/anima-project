@@ -44,6 +44,7 @@ DEFAULT_CONFIG = {
     "ui": {
         "character_gif": "assets/expression1.gif",
         "window_opacity": 0.95,
+        "size_mode": "Fixed Size",
         "window_size": [200, 200],
         "move_step": 12,
         "wander_interval_ms": 700
@@ -265,16 +266,28 @@ class SettingsManager(QMainWindow):
         opacity_row.addStretch()
         window_layout.addLayout(opacity_row)
         
+        # Size mode (Fixed, Fit Width, Fit Height)
+        size_mode_row = QHBoxLayout()
+        size_mode_row.addWidget(QLabel("Size Mode:"))
+        self.size_mode_combo = QComboBox()
+        self.size_mode_combo.addItems(["Fixed Size", "Fit Width", "Fit Height"])
+        self.size_mode_combo.setCurrentText(self.config["ui"].get("size_mode", "Fixed Size"))
+        self.size_mode_combo.currentTextChanged.connect(self._on_size_mode_changed)
+        size_mode_row.addWidget(self.size_mode_combo)
+        size_mode_row.addStretch()
+        window_layout.addLayout(size_mode_row)
+
         # Window size
         size_row = QHBoxLayout()
         size_row.addWidget(QLabel("Window Size:"))
         self.width_input = QSpinBox()
-        self.width_input.setRange(100, 500)
+        self.width_input.setRange(50, 2000)
         self.width_input.setValue(self.config["ui"]["window_size"][0])
         size_row.addWidget(self.width_input)
-        size_row.addWidget(QLabel("x"))
+        self._size_label_x = QLabel("x")
+        size_row.addWidget(self._size_label_x)
         self.height_input = QSpinBox()
-        self.height_input.setRange(100, 500)
+        self.height_input.setRange(50, 2000)
         self.height_input.setValue(self.config["ui"]["window_size"][1])
         size_row.addWidget(self.height_input)
         size_row.addStretch()
@@ -495,6 +508,7 @@ class SettingsManager(QMainWindow):
             "ui": {
                 "character_gif": self.asset_input.text(),
                 "window_opacity": self.opacity_input.value(),
+                "size_mode": self.size_mode_combo.currentText() if hasattr(self, 'size_mode_combo') else self.config["ui"].get("size_mode", "Fixed Size"),
                 "window_size": [self.width_input.value(), self.height_input.value()],
                 "move_step": self.step_input.value(),
                 "wander_interval_ms": self.interval_input.value()
@@ -554,10 +568,35 @@ class SettingsManager(QMainWindow):
         # UI tab
         self.asset_input.setText(self.config["ui"]["character_gif"])
         self.opacity_input.setValue(self.config["ui"]["window_opacity"])
+        if hasattr(self, 'size_mode_combo'):
+            self.size_mode_combo.setCurrentText(self.config["ui"].get("size_mode", "Fixed Size"))
         self.width_input.setValue(self.config["ui"]["window_size"][0])
         self.height_input.setValue(self.config["ui"]["window_size"][1])
         self.step_input.setValue(self.config["ui"]["move_step"])
         self.interval_input.setValue(self.config["ui"]["wander_interval_ms"])
+        # Apply size mode UI state
+        if hasattr(self, 'size_mode_combo'):
+            self._apply_size_mode_ui(self.size_mode_combo.currentText())
+
+    def _on_size_mode_changed(self, mode: str):
+        self._apply_size_mode_ui(mode)
+
+    def _apply_size_mode_ui(self, mode: str):
+        # Enable/disable width/height inputs depending on chosen mode.
+        if mode == "Fixed Size":
+            self.width_input.setEnabled(True)
+            self.height_input.setEnabled(True)
+            self._size_label_x.setVisible(True)
+        elif mode == "Fit Width":
+            # Width is controlling; height will be derived by the character UI.
+            self.width_input.setEnabled(True)
+            self.height_input.setEnabled(False)
+            self._size_label_x.setVisible(False)
+        elif mode == "Fit Height":
+            # Height is controlling; width will be derived by the character UI.
+            self.width_input.setEnabled(False)
+            self.height_input.setEnabled(True)
+            self._size_label_x.setVisible(False)
         
     def reset_to_defaults(self):
         """Reset all settings to defaults"""
