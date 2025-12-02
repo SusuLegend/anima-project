@@ -31,8 +31,8 @@ class WebSearcher:
         self.ddgs = DDGS() if DDGS_AVAILABLE else None
     
     def search(
-        self, 
-        query: str, 
+        self,
+        query: str,
         max_results: int = 5,
         region: str = "wt-wt"
     ) -> List[Dict[str, str]]:
@@ -76,9 +76,10 @@ class WebSearcher:
             }]
     
     def search_formatted(
-        self, 
-        query: str, 
-        max_results: int = 5
+        self,
+        query: str,
+        max_results: int = 5,
+        region: str = "wt-wt"
     ) -> str:
         """
         Search and return formatted results as a string.
@@ -90,7 +91,7 @@ class WebSearcher:
         Returns:
             Formatted string with search results
         """
-        results = self.search(query, max_results)
+        results = self.search(query, max_results=max_results, region=region)
         
         if not results:
             return f"No results found for: {query}"
@@ -137,7 +138,7 @@ class WebSearcher:
             return f"Found results for '{query}' but couldn't extract summaries."
 
 
-def web_search(query: str, max_results: int = 5) -> str:
+def web_search(query: str, max_results: int = 5, region: str = "wt-wt") -> str:
     """
     Simple function to search the web and return formatted results.
     
@@ -149,7 +150,7 @@ def web_search(query: str, max_results: int = 5) -> str:
         Formatted string with search results
     """
     searcher = WebSearcher()
-    return searcher.search_formatted(query, max_results)
+    return searcher.search_formatted(query, max_results=max_results, region=region)
 
 
 def quick_search(query: str) -> str:

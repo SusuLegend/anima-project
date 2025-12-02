@@ -4,12 +4,13 @@ import qrcode from 'qrcode-terminal'
 import Pino from "pino"
 import fs from 'fs'
 
-async function whatsapp_calling_message() {
+async function startWhatsAppListener() {
     const { state, saveCreds } = await useMultiFileAuthState("auth") // saves session files
 
     const sock = makeWASocket({
         auth: state,
-        logger: Pino({ level: 'silent' }) // Reduce log spam
+        // use info level so we can see basic events; change back to 'silent' if too noisy
+        logger: Pino({ level: 'info' })
     });
 
     sock.ev.on("connection.update", (update) => {
@@ -29,7 +30,7 @@ async function whatsapp_calling_message() {
             
             if (shouldReconnect) {
                 console.log('Reconnecting in 5 seconds...')
-                setTimeout(() => whatsapp_calling_message(), 5000) // Fixed: use correct function name
+                setTimeout(() => startWhatsAppListener(), 5000) // reconnect
             } else {
                 console.log('Logged out. Please delete auth folder and scan QR again.')
             }
@@ -41,8 +42,11 @@ async function whatsapp_calling_message() {
     sock.ev.on("creds.update", saveCreds)
 
     sock.ev.on("messages.upsert", async m => {
+        // Only process actual new incoming notifications
+        if (m.type !== 'notify') return;
         const msg = m.messages[0];
-        if (!msg.message) return;
+        if (!msg || !msg.message) return;
+        console.log("[whatsapp] notify id=", msg.key.id, "from=", msg.key.remoteJid);
 
         // Get sender name, remoteJid, and group info
         const senderName = msg.pushName || msg.key.participant || msg.key.remoteJid;
@@ -79,6 +83,13 @@ async function whatsapp_calling_message() {
                 groupMetadata = null;
             }
         }
+        // Pull quoted text if present
+        const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        let quotedText = '';
+        if (quoted) {
+            quotedText = quoted?.conversation || quoted?.extendedTextMessage?.text || quoted?.imageMessage?.caption || '';
+        }
+
         if (msg.message.conversation) {
             text = msg.message.conversation;
         } else if (msg.message.extendedTextMessage && msg.message.extendedTextMessage.text) {
@@ -99,6 +110,38 @@ async function whatsapp_calling_message() {
             }
         } else if (msg.message.imageMessage && msg.message.imageMessage.caption) {
             text = msg.message.imageMessage.caption;
+        } else if (msg.message.videoMessage && msg.message.videoMessage.caption) {
+            text = msg.message.videoMessage.caption;
+        } else if (msg.message.documentMessage && msg.message.documentMessage.caption) {
+            text = msg.message.documentMessage.caption;
+        } else if (msg.message.audioMessage) {
+            text = '[Audio]';
+        } else if (msg.message.stickerMessage) {
+            text = '[Sticker]';
+        } else if (msg.message.pollCreationMessage) {
+            text = `[Poll] ${msg.message.pollCreationMessage.name}`;
+        } else if (msg.message.listMessage) {
+            text = '[List message]';
+        } else if (msg.message.buttonsMessage) {
+            text = '[Buttons message]';
+        } else if (msg.message.templateMessage) {
+            text = '[Template message]';
+        } else if (msg.message.reactionMessage) {
+            text = `[Reaction] ${msg.message.reactionMessage.text || ''}`;
+        } else if (msg.message.ephemeralMessage) {
+            // unwrap ephemeral container
+            const inner = msg.message.ephemeralMessage.message;
+            if (inner?.extendedTextMessage?.text) {
+                text = inner.extendedTextMessage.text;
+            } else if (inner?.conversation) {
+                text = inner.conversation;
+            } else {
+                text = '[Ephemeral message]';
+            }
+        }
+
+        if (quotedText) {
+            text = `${text} (quoted: ${quotedText})`;
         }
 
         // Get timestamp
@@ -128,8 +171,49 @@ async function whatsapp_calling_message() {
             }
         }
         messages.push(messageInfo);
-        fs.writeFileSync(filePath, JSON.stringify(messages, null, 2));
+        // Atomic write: write to temp then rename
+        try {
+            const tmpPath = filePath + '.tmp';
+            fs.writeFileSync(tmpPath, JSON.stringify(messages, null, 2));
+            fs.renameSync(tmpPath, filePath);
+            console.log('[whatsapp] appended message count=', messages.length);
+        } catch (writeErr) {
+            console.error('[whatsapp] failed writing messages.json', writeErr);
+        }
     });
 }
-whatsapp_calling_message()
+
+// Export function to get all unread messages from messages.json
+export function getAllUnreadMessages() {
+    const filePath = './messages.json';
+    
+    if (!fs.existsSync(filePath)) {
+        return { messages: [], count: 0 };
+    }
+    
+    try {
+        const messages = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        return {
+            messages: messages,
+            count: messages.length
+        };
+    } catch (e) {
+        console.error('Error reading messages.json:', e);
+        return { messages: [], count: 0, error: e.message };
+    }
+}
+// Export start function so external process (Python) can control lifecycle
+export { startWhatsAppListener };
+
+// If executed directly (not imported by Python dynamic import), start automatically
+try {
+    // For ESM, process.argv[1] is the path to the script invoked
+    const invoked = process.argv[1];
+    if (invoked && invoked.endsWith('index.js')) {
+        console.log('[whatsapp] direct run detected, starting listener...');
+        startWhatsAppListener();
+    }
+} catch (e) {
+    // Safe ignore
+}
 
