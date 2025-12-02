@@ -10,7 +10,7 @@ class GeminiIntegration:
     def __init__(self, api_key: str = None, system_prompt: str = None):
         load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
         self.api_key = api_key or os.getenv('GEMINI_API_KEY')
-        self.base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+        self.base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite"
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY not found in .env or not provided.")
         self.headers = {

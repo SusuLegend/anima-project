@@ -732,9 +732,9 @@ class SettingsManager(QMainWindow):
             self.tool_server_process = subprocess.Popen(
                 [sys.executable, "-m", "uvicorn", "src.mcp_server:api", "--host", "127.0.0.1", "--port", str(TOOL_SERVER_PORT)],
                 cwd=str(PROJECT_ROOT),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+                stdout=None,  # Let output go to parent terminal
+                stderr=None,  # Let errors go to parent terminal
+                creationflags=0 if sys.platform == "win32" else 0  # Show console window
             )
             logging.info(f"Started tool server with PID {self.tool_server_process.pid}")
             self.tool_server_started_by_us = True  # Mark that we started it

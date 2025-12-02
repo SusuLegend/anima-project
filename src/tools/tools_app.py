@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi import BackgroundTasks
 from contextlib import asynccontextmanager
-from pydantic import BaseModel
 import importlib
 from pathlib import Path
 import sys

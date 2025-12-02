@@ -26,7 +26,6 @@ import os
 import psutil
 import requests
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from src.ai_brain.gemini_integration import GeminiIntegration
 
 CONFIG_PATH = Path(__file__).parent.parent.parent / "config.json"
 def load_config():

@@ -54,6 +54,20 @@ llm_tools.schema.append({
 })
 
 llm_tools.schema.append({
+    "name": "search",
+    "description": "Search the internet for information on a given query.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "The search query to look up on the internet."},
+            "max_results": {"type": "integer", "description": "Maximum number of search results to return.", "default": 3},
+            "formatted": {"type": "boolean", "description": "Whether to return formatted output.", "default": True}
+        },
+        "required": ["query"]
+    }
+})
+
+llm_tools.schema.append({
     "name": "get_weather_info",
     "description": "Get weather information for a specified city.",
     "parameters": {
