@@ -212,6 +212,28 @@ def shutdown():
 	logger.info("[shutdown] Cleanup complete")
 	return {"message": "Server cleanup initiated. Please terminate the uvicorn process."}
 
+# Gmail endpoint: returns new unread email subjects and bodies
+
+# Gmail endpoint dependencies
+GMAIL_CREDENTIALS_PATH = PROJECT_ROOT / "src" / "tools" / "google_listener" / "gcp_credential.json"
+GMAIL_TOKEN_PATH = PROJECT_ROOT  / "token.pickle"
+
+@app.get("/gmail")
+def get_gmail():
+	"""
+	Returns a list of new unread emails (subject, body, sender) from Gmail.
+	Authenticates using gcp_credential.json and token.pickle in google_listener.
+	Marks emails as read after fetching.
+	"""
+	try:
+		gmail_api = importlib.import_module("src.tools.google_listener.gmail_api")
+		service = gmail_api.authenticate_gmail(str(GMAIL_CREDENTIALS_PATH), str(GMAIL_TOKEN_PATH))
+		emails = gmail_api.get_new_email_subject_and_body(service)
+		return {"status": "success", "emails": emails}
+	except Exception as e:
+		logger.error(f"[gmail] error: {e}")
+		raise HTTPException(status_code=500, detail=str(e))
+	
 # New Outlook endpoint - returns emails, events, and tasks
 @app.get("/outlook")
 def get_outlook():
