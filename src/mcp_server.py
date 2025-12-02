@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_mcp import FastApiMCP 
 from src.database.rag_pipeline import RAGPipeline
 from src.ai_brain.gemini_integration import GeminiIntegration
+from src.ai_brain.function_calling import llm_tools
 import os
 from dotenv import load_dotenv
 
@@ -43,16 +44,27 @@ gemini_api_key = os.getenv('GEMINI_API_KEY')
 gemini_system_prompt = os.getenv('GEMINI_SYSTEM_PROMPT', 'You are a helpful assistant.')
 gemini_ai = GeminiIntegration(api_key=gemini_api_key, system_prompt=gemini_system_prompt)
 
-mcp = FastApiMCP(api)
-# RAG Pipeline MCP Tool
-@mcp.tools()
+def get_intent_function_name(prompt: str, api_key: str = None, system_prompt: str = None):
+    # Compose a prompt for Gemini to select the function
+    tool_list = "\n".join([f"{tool['name']}: {tool['description']}" for tool in llm_tools.get_schema()])
+    selection_prompt = (
+        f"Given the following user request:\n{prompt}\n\n"
+        f"Available functions:\n{tool_list}\n\n"
+        "Which function name best matches the user's intent? Only return the function name."
+    )
+    function_name = gemini_ai.get_response(selection_prompt).strip()
+    return function_name
+
+
+# Gemini chat endpoint
+@api.post("/gemini_chat")
 def gemini_chat(prompt: str):
     """Get a response from Gemini AI."""
     reply = gemini_ai.get_response(prompt)
     return {"reply": reply}
 
-# RAG Pipeline MCP Tool
-@mcp.tools()
+# RAG search endpoint
+@api.post("/rag_search")
 def rag_search(query: str, top_k: int = 3):
     """Semantic search using RAG pipeline."""
     results = rag_pipeline.search(query, top_k=top_k, return_text_only=True)

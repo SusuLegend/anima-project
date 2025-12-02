@@ -52,3 +52,17 @@ llm_tools.schema.append({
     "description": "Get WhatsApp unread messages using the MCP server.",
     "parameters": {}
 })
+
+llm_tools.schema.append({
+    "name": "get_weather_info",
+    "description": "Get weather information for a specified city.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "city": {"type": "string", "description": "Name of the city."},
+            "days": {"type": "integer", "description": "Number of days for forecast.", "default": 1},
+            "formatted": {"type": "boolean", "description": "Whether to return formatted output.", "default": False}
+        },
+        "required": ["city"]
+    }
+})
