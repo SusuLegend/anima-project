@@ -123,8 +123,27 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # New Outlook endpoint - returns emails, events, and tasks
-@app.get("/get_outlook")
+@app.get("/outlook")
 def get_outlook():
+	"""Aggregate Microsoft 365 data.
+
+	Returns a JSON payload combining:
+	- emails: recent unread messages from Inbox (deduped across calls)
+	- events: newly seen calendar events
+	- reminders: time-based reminders (1 day, 1 hour, 15 minutes before)
+	- tasks: current pending tasks (excludes completed)
+	- new_tasks: tasks first seen in this session
+
+	Notes:
+	- Uses OAuth via the `login` helper and Microsoft Graph.
+	- Each call may return empty lists if nothing new or if Graph is unreachable.
+
+	Examples:
+	- http://127.0.0.1:8000/get_outlook
+	"""
+	'''
+	
+	'''
 	try:
 		api_fetch = importlib.import_module("src.tools.microsoft_listener.api_fetch")
 		emails = api_fetch.get_new_emails()
@@ -144,6 +163,24 @@ def get_outlook():
 # Weather info endpoint - requires city, optional days & formatted
 @app.get("/weather")
 def get_weather(city: str, days: int = 1, formatted: bool = False):
+	"""Fetch weather for a city using Open‑Meteo.
+
+	Query params:
+	- city: required city name (e.g., "Sydney", "New York")
+	- days: optional forecast length (1–7, clamped)
+	- formatted: when true, returns a human‑readable summary string; otherwise returns structured JSON.
+
+	Behavior:
+	- Geocodes the city, then fetches current + daily forecast.
+	- On error (city not found or network issues), returns HTTP 404/500.
+
+	Examples:
+	- JSON:      http://127.0.0.1:8000/weather?city=Sydney&days=3
+	- Formatted: http://127.0.0.1:8000/weather?city=New%20York&days=2&formatted=true
+	"""
+	'''
+	
+	'''
 	try:
 		weather_info = importlib.import_module("src.tools.other_listener.weather_info")
 		# Clamp days between 1 and 7 for reasonable responses
@@ -167,6 +204,25 @@ def get_weather(city: str, days: int = 1, formatted: bool = False):
 # Web search endpoint
 @app.get("/search")
 def search(query: str, max_results: int = 5, formatted: bool = False, region: str = "wt-wt"):
+	"""DuckDuckGo web search.
+
+	Query params:
+	- query: required search text
+	- max_results: 1–20, clamped
+	- region: locale bias (e.g., "us-en", "au-en", "wt-wt")
+	- formatted: when true, returns formatted text; otherwise returns list of results.
+
+	Returns:
+	- formatted: { text }
+	- json: { results: [{ title, link, snippet }] }
+
+	Examples:
+	- JSON:      http://127.0.0.1:8000/search?query=best%20coffee&max_results=5&region=au-en
+	- Formatted: http://127.0.0.1:8000/search?query=fastapi%20tutorial&formatted=true&region=us-en
+	"""
+	'''
+	
+	'''
 	try:
 		web_search_mod = importlib.import_module("src.tools.other_listener.web_search")
 		max_results = max(1, min(max_results, 20))
@@ -185,7 +241,16 @@ def search(query: str, max_results: int = 5, formatted: bool = False, region: st
 
 @app.get("/whatsapp")
 def get_whatsapp():
-	"""Return collected WhatsApp messages from persistent listener."""
+	"""Return collected WhatsApp messages from the persistent Node listener.
+
+	Behavior:
+	- Ensures the background Node process is running (auto‑restart if down).
+	- Reads `messages.json` written by the listener and returns messages with count.
+	- If no messages yet or file missing, returns an empty list and status note.
+
+	Examples:
+	- http://127.0.0.1:8000/whatsapp
+	"""
 	try:
 		# Ensure listener running (auto-restart if crashed)
 		start_whatsapp_listener()
@@ -209,6 +274,16 @@ def get_whatsapp():
 
 @app.get("/whatsapp/health")
 def whatsapp_health():
+	"""Report health of the WhatsApp Node listener.
+
+	Returns:
+	- running: boolean indicating process state
+	- pid: OS process id when running
+	- restart_count: number of auto‑restarts performed by heartbeat
+
+	Examples:
+	- http://127.0.0.1:8000/whatsapp/health
+	"""
 	alive = WHATSAPP_PROC is not None and WHATSAPP_PROC.poll() is None
 	pid = WHATSAPP_PROC.pid if alive and WHATSAPP_PROC is not None else None
 	return {
@@ -220,4 +295,8 @@ def whatsapp_health():
 # Root endpoint
 @app.get("/")
 def root():
+	"""Service ping endpoint.
+
+	Returns a simple JSON message confirming the Tools API is up.
+	"""
 	return {"message": "Unified Tools API is running."}
