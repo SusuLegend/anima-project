@@ -11,6 +11,9 @@ import os
 import asyncio
 import time
 import logging
+import signal
+import atexit
+import psutil
 
 # Choosing a non-standard port to minimize chance of port collision
 # Setup project root path - go up to the project root (anima-capstone)
@@ -83,14 +86,71 @@ def start_whatsapp_listener():
 def stop_whatsapp_listener():
 	"""Terminate the Node.js WhatsApp listener if running."""
 	global WHATSAPP_PROC
-	if WHATSAPP_PROC and WHATSAPP_PROC.poll() is None:
+	
+	terminated_pids = []
+	
+	# First, try to stop the tracked process
+	if WHATSAPP_PROC is None:
+		logger.info("[whatsapp] no listener process to stop (WHATSAPP_PROC is None)")
+	elif WHATSAPP_PROC.poll() is not None:
+		logger.info(f"[whatsapp] listener already stopped (exit code: {WHATSAPP_PROC.poll()})")
+		WHATSAPP_PROC = None
+	else:
 		try:
+			pid = WHATSAPP_PROC.pid
+			logger.info(f"[whatsapp] terminating listener pid={pid}")
 			WHATSAPP_PROC.terminate()
-			WHATSAPP_PROC.wait(timeout=5)
-			logger.info("[whatsapp] listener terminated")
+			try:
+				WHATSAPP_PROC.wait(timeout=5)
+				logger.info(f"[whatsapp] listener terminated gracefully pid={pid}")
+				terminated_pids.append(pid)
+			except subprocess.TimeoutExpired:
+				logger.warning(f"[whatsapp] listener didn't stop gracefully, killing pid={pid}")
+				WHATSAPP_PROC.kill()
+				WHATSAPP_PROC.wait()
+				logger.info(f"[whatsapp] listener killed pid={pid}")
+				terminated_pids.append(pid)
 		except Exception as e:
 			logger.error(f"[whatsapp] error terminating listener: {e}")
-	WHATSAPP_PROC = None
+		finally:
+			WHATSAPP_PROC = None
+	
+	# Also hunt down any orphaned Node.js processes running index.js
+	try:
+		logger.info("[whatsapp] searching for orphaned Node.js processes...")
+		killed_count = 0
+		for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+			try:
+				cmdline = proc.info.get('cmdline') or []
+				proc_name = proc.info.get('name', '').lower()
+				
+				# Look for node processes
+				if 'node' in proc_name:
+					cmdline_str = ' '.join(str(arg) for arg in cmdline).lower()
+					# Check if it's running our whatsapp listener
+					if 'whatsapp_listener' in cmdline_str and 'index.js' in cmdline_str:
+						pid = proc.info['pid']
+						if pid not in terminated_pids:
+							logger.warning(f"[whatsapp] found orphaned listener process pid={pid}")
+							logger.info(f"[whatsapp] cmdline: {' '.join(str(arg) for arg in cmdline)}")
+							try:
+								proc.terminate()
+								proc.wait(timeout=3)
+								logger.info(f"[whatsapp] orphaned process terminated pid={pid}")
+								killed_count += 1
+							except psutil.TimeoutExpired:
+								proc.kill()
+								logger.info(f"[whatsapp] orphaned process killed (forced) pid={pid}")
+								killed_count += 1
+			except (psutil.NoSuchProcess, psutil.AccessDenied):
+				pass
+		
+		if killed_count > 0:
+			logger.info(f"[whatsapp] cleaned up {killed_count} orphaned process(es)")
+		else:
+			logger.info("[whatsapp] no orphaned processes found")
+	except Exception as e:
+		logger.error(f"[whatsapp] error hunting orphaned processes: {e}")
 
 RESTART_COUNT = 0
 
@@ -121,7 +181,36 @@ async def lifespan(app: FastAPI):
 		heartbeat.cancel()
 		stop_whatsapp_listener()
 
+# Cleanup handlers for script termination
+def cleanup_on_exit():
+	"""Cleanup handler called on script exit"""
+	logger.info("[cleanup] Script shutting down, stopping WhatsApp listener...")
+	stop_whatsapp_listener()
+
+def signal_handler(signum, frame):
+	"""Handle termination signals"""
+	logger.info(f"[cleanup] Received signal {signum}, shutting down...")
+	stop_whatsapp_listener()
+	sys.exit(0)
+
+# Register cleanup handlers
+atexit.register(cleanup_on_exit)
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
 app = FastAPI(lifespan=lifespan)
+
+# Shutdown endpoint
+@app.post("/shutdown")
+def shutdown():
+	"""
+	Gracefully shutdown the server and clean up all background processes.
+	This endpoint stops the WhatsApp listener and prepares for server termination.
+	"""
+	logger.info("[shutdown] Shutdown endpoint called, cleaning up...")
+	stop_whatsapp_listener()
+	logger.info("[shutdown] Cleanup complete")
+	return {"message": "Server cleanup initiated. Please terminate the uvicorn process."}
 
 # New Outlook endpoint - returns emails, events, and tasks
 @app.get("/outlook")

@@ -738,7 +738,16 @@ class SettingsManager(QMainWindow):
             return  # Don't stop a server we didn't start
         
         try:
-            # Terminate the process we started
+            # First, ask the server to clean up its own processes (like WhatsApp Node.js)
+            try:
+                requests.post(f"{TOOL_SERVER_URL}/shutdown", timeout=5)
+            except Exception:
+                pass  # Server might already be down
+            
+            # Give it a moment to clean up
+            time.sleep(1)
+            
+            # Terminate the uvicorn process we started
             if self.tool_server_process:
                 self.tool_server_process.terminate()
                 try:
@@ -747,7 +756,7 @@ class SettingsManager(QMainWindow):
                     self.tool_server_process.kill()
                 self.tool_server_process = None
             
-            # Also kill any uvicorn processes on our port (cleanup orphaned processes)
+            # Also kill any orphaned uvicorn processes for tools_app
             current_pid = os.getpid()
             for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
                 try:
@@ -755,24 +764,11 @@ class SettingsManager(QMainWindow):
                         continue
                     
                     cmdline = proc.info.get('cmdline') or []
-                    # Check if it's a uvicorn process for tools_app on our port
+                    # Check if it's a uvicorn process for tools_app
                     if any('uvicorn' in str(arg).lower() for arg in cmdline) and \
                        any('tools_app' in str(arg) for arg in cmdline):
                         proc.terminate()
                         proc.wait(timeout=3)
-                        continue
-                    
-                    # Also check if process is listening on our port
-                    try:
-                        connections = proc.connections()
-                        for conn in connections:
-                            if hasattr(conn, 'laddr') and conn.laddr.port == TOOL_SERVER_PORT:
-                                if any('python' in str(arg).lower() for arg in cmdline):
-                                    proc.terminate()
-                                    proc.wait(timeout=3)
-                                    break
-                    except (psutil.AccessDenied, AttributeError):
-                        pass
                                 
                 except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
                     pass

@@ -507,7 +507,7 @@ class ToolsDialog(QtWidgets.QDialog):
                 result = "Gmail integration coming soon!"
                 
             elif category == "outlook":
-                response = requests.get(f"{base_url}/outlook", timeout=10)
+                response = requests.get(f"{base_url}/outlook", timeout=50)
                 if response.status_code == 200:
                     data = response.json()
                     if action == "check_all":
