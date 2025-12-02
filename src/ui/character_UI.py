@@ -23,6 +23,8 @@ from PySide6.QtWidgets import QDialog
 from PySide6.QtCore import QThread, Signal
 import math
 import os
+import psutil
+import requests
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from src.ai_brain.gemini_integration import GeminiIntegration
 
@@ -359,6 +361,242 @@ class SpeechBubble(QtWidgets.QWidget):
         # Auto-close after duration
         QtCore.QTimer.singleShot(self.duration_ms, self.close)
 
+class ToolsDialog(QtWidgets.QDialog):
+    """Dialog for selecting and executing tools from the tools folder"""
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent_widget = parent
+        self.setup_ui()
+    
+    def setup_ui(self):
+        """Setup the tools dialog UI"""
+        self.setWindowTitle("🔧 Tools")
+        self.setWindowFlags(QtCore.Qt.Dialog | QtCore.Qt.WindowStaysOnTopHint)
+        self.setMinimumSize(500, 400)
+        
+        layout = QtWidgets.QVBoxLayout(self)
+        
+        # Title
+        title = QtWidgets.QLabel("Select a tool to use:")
+        title.setStyleSheet("font-size: 16px; font-weight: bold; padding: 10px;")
+        layout.addWidget(title)
+        
+        # Tab widget for different listener categories
+        tabs = QtWidgets.QTabWidget()
+        tabs.addTab(self.create_google_tools_tab(), "📧 Google")
+        tabs.addTab(self.create_microsoft_tools_tab(), "📅 Microsoft")
+        tabs.addTab(self.create_whatsapp_tools_tab(), "💬 WhatsApp")
+        tabs.addTab(self.create_other_tools_tab(), "🌐 Other")
+        layout.addWidget(tabs)
+        
+        # Close button
+        close_btn = QtWidgets.QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+    
+    def create_google_tools_tab(self):
+        """Create Google tools tab"""
+        tab = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(tab)
+        
+        # Gmail section
+        gmail_group = QtWidgets.QGroupBox("Gmail")
+        gmail_layout = QtWidgets.QVBoxLayout()
+        
+        check_emails_btn = QtWidgets.QPushButton("📬 Check New Emails")
+        check_emails_btn.clicked.connect(lambda: self.execute_tool("gmail", "check_emails"))
+        gmail_layout.addWidget(check_emails_btn)
+        
+        gmail_group.setLayout(gmail_layout)
+        layout.addWidget(gmail_group)
+        
+        layout.addStretch()
+        return tab
+    
+    def create_microsoft_tools_tab(self):
+        """Create Microsoft tools tab"""
+        tab = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(tab)
+        
+        # Outlook section
+        outlook_group = QtWidgets.QGroupBox("Outlook")
+        outlook_layout = QtWidgets.QVBoxLayout()
+        
+        check_outlook_btn = QtWidgets.QPushButton("📧 Check Outlook Data")
+        check_outlook_btn.clicked.connect(lambda: self.execute_tool("outlook", "check_all"))
+        outlook_layout.addWidget(check_outlook_btn)
+        
+        check_emails_btn = QtWidgets.QPushButton("📬 Check New Emails")
+        check_emails_btn.clicked.connect(lambda: self.execute_tool("outlook", "check_emails"))
+        outlook_layout.addWidget(check_emails_btn)
+        
+        check_events_btn = QtWidgets.QPushButton("📅 Check Calendar Events")
+        check_events_btn.clicked.connect(lambda: self.execute_tool("outlook", "check_events"))
+        outlook_layout.addWidget(check_events_btn)
+        
+        check_tasks_btn = QtWidgets.QPushButton("✅ Check Tasks")
+        check_tasks_btn.clicked.connect(lambda: self.execute_tool("outlook", "check_tasks"))
+        outlook_layout.addWidget(check_tasks_btn)
+        
+        outlook_group.setLayout(outlook_layout)
+        layout.addWidget(outlook_group)
+        
+        layout.addStretch()
+        return tab
+    
+    def create_whatsapp_tools_tab(self):
+        """Create WhatsApp tools tab"""
+        tab = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(tab)
+        
+        whatsapp_group = QtWidgets.QGroupBox("WhatsApp")
+        whatsapp_layout = QtWidgets.QVBoxLayout()
+        
+        check_messages_btn = QtWidgets.QPushButton("💬 Check New Messages")
+        check_messages_btn.clicked.connect(lambda: self.execute_tool("whatsapp", "check_messages"))
+        whatsapp_layout.addWidget(check_messages_btn)
+        
+        whatsapp_group.setLayout(whatsapp_layout)
+        layout.addWidget(whatsapp_group)
+        
+        layout.addStretch()
+        return tab
+    
+    def create_other_tools_tab(self):
+        """Create other tools tab"""
+        tab = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(tab)
+        
+        # Weather section
+        weather_group = QtWidgets.QGroupBox("Weather")
+        weather_layout = QtWidgets.QVBoxLayout()
+        
+        check_weather_btn = QtWidgets.QPushButton("🌤️ Check Weather")
+        check_weather_btn.clicked.connect(lambda: self.execute_tool("weather", "check_weather"))
+        weather_layout.addWidget(check_weather_btn)
+        
+        weather_group.setLayout(weather_layout)
+        layout.addWidget(weather_group)
+        
+        # Web Search section
+        search_group = QtWidgets.QGroupBox("Web Search")
+        search_layout = QtWidgets.QVBoxLayout()
+        
+        web_search_btn = QtWidgets.QPushButton("🔍 Web Search")
+        web_search_btn.clicked.connect(lambda: self.execute_tool("search", "web_search"))
+        search_layout.addWidget(web_search_btn)
+        
+        search_group.setLayout(search_layout)
+        layout.addWidget(search_group)
+        
+        layout.addStretch()
+        return tab
+    
+    def execute_tool(self, category, action):
+        """Execute a tool based on category and action"""
+        self.parent_widget.show_chat_message(f"Executing {action}...", duration_ms=2000)
+        QtWidgets.QApplication.processEvents()
+        
+        try:
+            from urllib.parse import urlencode
+            
+            base_url = "http://127.0.0.1:8000"
+            
+            if category == "gmail":
+                # Note: Gmail API not yet exposed via tools_app.py
+                result = "Gmail integration coming soon!"
+                
+            elif category == "outlook":
+                response = requests.get(f"{base_url}/outlook", timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    if action == "check_all":
+                        emails = data.get('emails', [])
+                        events = data.get('events', [])
+                        tasks = data.get('tasks', [])
+                        result = f"📧 {len(emails)} new emails, 📅 {len(events)} events, ✅ {len(tasks)} tasks"
+                    elif action == "check_emails":
+                        emails = data.get('emails', [])
+                        if emails:
+                            email_list = "\n".join([f"• {e.get('subject', 'No subject')}" for e in emails[:3]])
+                            result = f"📬 {len(emails)} new emails:\n{email_list}"
+                        else:
+                            result = "📭 No new emails"
+                    elif action == "check_events":
+                        events = data.get('events', [])
+                        if events:
+                            event_list = "\n".join([f"• {e.get('subject', 'No title')}" for e in events[:3]])
+                            result = f"📅 {len(events)} upcoming events:\n{event_list}"
+                        else:
+                            result = "📅 No upcoming events"
+                    elif action == "check_tasks":
+                        tasks = data.get('tasks', [])
+                        if tasks:
+                            task_list = "\n".join([f"• {t.get('title', 'No title')}" for t in tasks[:3]])
+                            result = f"✅ {len(tasks)} tasks:\n{task_list}"
+                        else:
+                            result = "✅ No pending tasks"
+                else:
+                    result = f"Error: {response.status_code}"
+                    
+            elif category == "whatsapp":
+                response = requests.get(f"{base_url}/whatsapp", timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    messages = data.get('messages', [])
+                    if messages:
+                        msg_list = "\n".join([f"• {m.get('senderName', 'Unknown')}: {m.get('text', '')[:30]}..." for m in messages[-3:]])
+                        result = f"💬 {len(messages)} messages:\n{msg_list}"
+                    else:
+                        result = "💬 No new messages"
+                else:
+                    result = f"Error: {response.status_code}"
+                    
+            elif category == "weather":
+                # Prompt for city
+                city, ok = QtWidgets.QInputDialog.getText(
+                    self, "Weather Check", "Enter city name:"
+                )
+                if ok and city:
+                    params = urlencode({"city": city, "days": 1, "formatted": True})
+                    response = requests.get(f"{base_url}/weather?{params}", timeout=10)
+                    if response.status_code == 200:
+                        data = response.json()
+                        result = data.get('text', 'No data')
+                    else:
+                        result = f"Error: {response.status_code}"
+                else:
+                    return
+                    
+            elif category == "search":
+                # Prompt for search query
+                query, ok = QtWidgets.QInputDialog.getText(
+                    self, "Web Search", "Enter search query:"
+                )
+                if ok and query:
+                    params = urlencode({"query": query, "max_results": 3, "formatted": True})
+                    response = requests.get(f"{base_url}/search?{params}", timeout=10)
+                    if response.status_code == 200:
+                        data = response.json()
+                        result = data.get('text', 'No results')
+                    else:
+                        result = f"Error: {response.status_code}"
+                else:
+                    return
+            else:
+                result = "Unknown tool category"
+            
+            self.parent_widget.show_chat_message(result)
+            
+        except requests.exceptions.ConnectionError:
+            self.parent_widget.show_chat_message(
+                "⚠️ Cannot connect to tools API. Please make sure tools_app.py is running.",
+                duration_ms=5000
+            )
+        except Exception as e:
+            self.parent_widget.show_chat_message(f"Error: {str(e)}", duration_ms=5000)
+            print(f"Tool execution error: {e}")
+
 class FloatingCharacter(QtWidgets.QWidget):
     def show_chat_message(self, message, duration_ms=None):
         """Show message in a manga-style speech bubble with auto-adjusted duration"""
@@ -498,9 +736,10 @@ class FloatingCharacter(QtWidgets.QWidget):
         # Define buttons at 10, 11, and 12 o'clock: (angle_degrees, label, icon_text, callback)
         # Angles: 240° (10 o'clock), 270° (12 o'clock), 300° (11 o'clock)
         buttons_config = [
-            (0, "Prompt", "💬", self._on_prompt_click),      # 10 o'clock
-            (310, "Settings", "⚙️", self._on_settings_click),   # 12 o'clock (top)
-            (260, "Move", "✋", self._on_move_click),            # 11 o'clock
+            (360, "Prompt", "💬", self._on_prompt_click),      
+            (310, "Move", "✋", self._on_move_click),      
+            (260, "Close", "❌", self._on_quick_close_click),
+            (210, "Tools", "🔧", self._on_tools_click)         
         ]
         
         for angle, label, icon, callback in buttons_config:
@@ -570,41 +809,41 @@ class FloatingCharacter(QtWidgets.QWidget):
             self.show_chat_message("Move mode ON - Click and drag me!", duration_ms=2000)
             self.setCursor(QtCore.Qt.OpenHandCursor)
 
-    def _on_settings_click(self):
-        """Focus on the existing settings manager instead of opening a new one"""
+    def _on_quick_close_click(self):
+        """Quick close - shut down both character and settings manager"""
         self._hide_circular_menu()
         
-        try:
-            # Try to find the settings manager process
-            import psutil
-            current_pid = os.getpid()
-            settings_found = False
-            
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                try:
-                    cmdline = proc.info.get('cmdline')
-                    if cmdline and any('settings_manager.py' in str(arg) for arg in cmdline):
-                        if proc.info['pid'] != current_pid:
-                            settings_found = True
-                            self.show_chat_message(
-                                "Settings window is already open! Please check your taskbar.", 
-                                duration_ms=3000
-                            )
-                            break
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
-            
-            if not settings_found:
-                # No settings manager running, inform user
-                self.show_chat_message(
-                    "Please launch the settings manager separately to configure options.",
-                    duration_ms=3000
-                )
-                
-        except Exception as e:
-            self.show_chat_message(f"Error: {e}", duration_ms=3000)
-            print(f"Error checking for settings manager: {e}")
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            "Quick Close",
+            "Close both Character and Settings Manager?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+        )
         
+        if reply == QtWidgets.QMessageBox.Yes:
+            try:
+                # Find and terminate settings manager
+                current_pid = os.getpid()
+                for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                    try:
+                        cmdline = proc.info.get('cmdline')
+                        if cmdline and any('settings_manager.py' in str(arg) for arg in cmdline):
+                            if proc.info['pid'] != current_pid:
+                                proc.terminate()
+                                break
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+            except Exception as e:
+                print(f"Error closing settings manager: {e}")
+            
+            # Close this character window
+            QtWidgets.QApplication.quit()
+    def _on_tools_click(self):
+        """Show tools selection dialog"""
+        self._hide_circular_menu()
+        dialog = ToolsDialog(self)
+        dialog.exec()
+
     def mousePressEvent(self, event: QtGui.QMouseEvent):
         if event.button() == QtCore.Qt.LeftButton:
             # If menu is visible, clicking anywhere hides it
