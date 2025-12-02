@@ -500,7 +500,7 @@ class ToolsDialog(QtWidgets.QDialog):
         try:
             from urllib.parse import urlencode
             
-            base_url = "http://127.0.0.1:8576"
+            base_url = "http://127.0.0.1:8576/tools"
             
             if category == "gmail":
                 # Note: Gmail API not yet exposed via tools_app.py

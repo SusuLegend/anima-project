@@ -56,7 +56,7 @@ DEFAULT_CONFIG = {
 CONFIG_PATH = Path(__file__).parent.parent.parent / "config.json"
 TOOL_SERVER_PORT = 8576
 TOOL_SERVER_URL = f"http://127.0.0.1:{TOOL_SERVER_PORT}"
-
+PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 
 class SettingsManager(QMainWindow):
     """Main settings window for configuring the AI assistant"""
@@ -451,7 +451,7 @@ class SettingsManager(QMainWindow):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Character GIF",
-            str(Path(__file__).parent.parent.parent / "assets"),
+            str(PROJECT_ROOT / "assets"),
             "GIF Files (*.gif);;All Files (*.*)"
         )
         if file_path:
@@ -527,7 +527,7 @@ class SettingsManager(QMainWindow):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Load Settings File",
-            str(Path(__file__).parent.parent.parent),
+            str(PROJECT_ROOT),
             "JSON Files (*.json);;All Files (*.*)"
         )
         if file_path:
@@ -585,7 +585,7 @@ class SettingsManager(QMainWindow):
         # Launch application
         try:
             import subprocess
-            main_script = Path(__file__).parent / "character_UI.py"
+            main_script = str(PROJECT_ROOT / "src" / "ui" / "character_UI.py")
             self.running_process = subprocess.Popen([sys.executable, str(main_script)])
             
             # Enable stop button, disable start button
@@ -674,8 +674,8 @@ class SettingsManager(QMainWindow):
     def start_tool_server(self):
         """Start the tool server in the background"""
         try:
-            tools_dir = Path(__file__).parent.parent / "tools"
-            tools_app = tools_dir / "tools_app.py"
+            tools_dir = PROJECT_ROOT / "src" / "tools"
+            tools_app = tools_dir / "mcp_server.py"
             
             if not tools_app.exists():
                 self.statusBar().showMessage(f"⚠️ Tool server script not found: {tools_app}", 5000)
@@ -683,7 +683,7 @@ class SettingsManager(QMainWindow):
             
             # Start uvicorn server in background
             self.tool_server_process = subprocess.Popen(
-                [sys.executable, "-m", "uvicorn", "tools_app:app", "--host", "127.0.0.1", "--port", str(TOOL_SERVER_PORT)],
+                [sys.executable, "-m", "uvicorn", "mcp_server:app", "--host", "127.0.0.1", "--port", str(TOOL_SERVER_PORT)],
                 cwd=str(tools_dir),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -740,7 +740,7 @@ class SettingsManager(QMainWindow):
         try:
             # First, ask the server to clean up its own processes (like WhatsApp Node.js)
             try:
-                requests.post(f"{TOOL_SERVER_URL}/shutdown", timeout=5)
+                requests.post(f"{TOOL_SERVER_URL}/tools/shutdown", timeout=5)
             except Exception:
                 pass  # Server might already be down
             
