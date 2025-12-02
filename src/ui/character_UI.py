@@ -22,6 +22,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtWidgets import QDialog
 from PySide6.QtCore import QThread, Signal
 import math
+import os
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from src.ai_brain.gemini_integration import GeminiIntegration
 
@@ -81,7 +82,135 @@ WANDER_INTERVAL_MS = 700
 WINDOW_OPACITY = 0.95
 MOVE_STEP = 12 # pixels per wander step
 # -----------------------------------------------------------
-
+class QuestionBubble(QtWidgets.QDialog):
+    """Interactive question input speech bubble"""
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent_widget = parent
+        self.input_text = ""
+        
+        # Window setup
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Tool | QtCore.Qt.WindowStaysOnTopHint)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        
+        # Dimensions
+        bubble_width = 350
+        bubble_height = 120
+        
+        # Padding values
+        horizontal_padding = 20
+        vertical_padding = 15
+        
+        # Tail properties
+        self.tail_height = 20
+        
+        # Set widget size
+        self.setFixedSize(bubble_width, bubble_height + self.tail_height)
+        
+        # Layout
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(horizontal_padding, vertical_padding, horizontal_padding, vertical_padding + self.tail_height)
+        layout.setSpacing(10)
+        
+        # Label
+        self.label = QtWidgets.QLabel("Ask Chika:")
+        self.label.setStyleSheet("""
+            QLabel {
+                background: transparent;
+                color: #222;
+                font-size: 16px;
+                font-weight: bold;
+            }
+        """)
+        layout.addWidget(self.label)
+        
+        # Input box
+        self.input_box = QtWidgets.QLineEdit()
+        self.input_box.setPlaceholderText("Type your question...")
+        self.input_box.setStyleSheet("""
+            QLineEdit {
+                background: white;
+                border: 2px solid #4a90e2;
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-size: 15px;
+                color: #222;
+            }
+            QLineEdit:focus {
+                border: 2px solid #357abd;
+            }
+        """)
+        self.input_box.returnPressed.connect(self._accept_if_valid)
+        layout.addWidget(self.input_box)
+        
+    def paintEvent(self, event):
+        """Draw the manga-style speech bubble"""
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        
+        # Bubble dimensions
+        bubble_rect = QtCore.QRectF(0, 0, self.width(), self.height() - self.tail_height)
+        
+        # Create path for bubble with tail
+        path = QtGui.QPainterPath()
+        
+        # Main bubble (rounded rectangle)
+        path.addRoundedRect(bubble_rect, 15, 15)
+        
+        # Tail (pointing down to character)
+        tail_start_x = self.width() / 2 - 15
+        tail_tip_x = self.width() / 2
+        tail_end_x = self.width() / 2 + 15
+        tail_start_y = self.height() - self.tail_height
+        tail_tip_y = self.height()
+        
+        tail = QtGui.QPainterPath()
+        tail.moveTo(tail_start_x, tail_start_y)
+        tail.lineTo(tail_tip_x, tail_tip_y)
+        tail.lineTo(tail_end_x, tail_start_y)
+        tail.closeSubpath()
+        
+        path.addPath(tail)
+        
+        # Draw white fill with black outline (classic manga style)
+        painter.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0), 3))  # Black outline
+        painter.setBrush(QtGui.QBrush(QtGui.QColor(255, 255, 255)))  # White fill
+        painter.drawPath(path)
+        
+        # Optional: Add inner shadow effect for depth
+        shadow_pen = QtGui.QPen(QtGui.QColor(200, 200, 200), 1)
+        painter.setPen(shadow_pen)
+        inner_rect = bubble_rect.adjusted(2, 2, -2, -2)
+        painter.drawRoundedRect(inner_rect, 13, 13)
+        
+    def show_bubble(self):
+        """Position and show the speech bubble above the character"""
+        # Position above the character
+        global_pos = self.parent_widget.mapToGlobal(self.parent_widget.rect().center())
+        x = global_pos.x() - self.width() // 2
+        y = global_pos.y() - self.parent_widget.height() // 2 - self.height() - 5
+        
+        # Clamp to screen bounds
+        screen_geom = QtWidgets.QApplication.primaryScreen().availableGeometry()
+        x = max(screen_geom.left(), min(x, screen_geom.right() - self.width()))
+        y = max(screen_geom.top(), y)
+        
+        self.move(x, y)
+        self.show()
+        
+        # Set focus to input box
+        self.input_box.setFocus()
+    
+    def _accept_if_valid(self):
+        """Accept dialog if input is not empty"""
+        if self.input_box.text().strip():
+            self.input_text = self.input_box.text().strip()
+            self.accept()
+    
+    def get_input(self):
+        """Return the input text"""
+        return self.input_text
+    
 class SpeechBubble(QtWidgets.QWidget):
     """Custom manga-style speech bubble widget"""
     def __init__(self, parent, message, duration_ms=8000):
@@ -94,9 +223,23 @@ class SpeechBubble(QtWidgets.QWidget):
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Tool | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         
-        # Calculate dimensions based on parent (GIF is 180x180)
-        max_bubble_height = 90  # Half of 180
-        max_bubble_width = 450
+        # Calculate dimensions dynamically based on message length
+        message_length = len(message)
+        
+        # Adjust max dimensions based on message length
+        if message_length < 30:
+            max_bubble_width = 250
+            max_bubble_height = 80
+        elif message_length > 100:
+            max_bubble_width = 400
+            max_bubble_height = 120
+        elif message_length > 200:
+            max_bubble_width = 500
+            max_bubble_height = 180
+        else:
+            max_bubble_width = 600
+            max_bubble_height = 250
+        
         min_bubble_width = 160
         
         # Padding values
@@ -217,59 +360,27 @@ class SpeechBubble(QtWidgets.QWidget):
         QtCore.QTimer.singleShot(self.duration_ms, self.close)
 
 class FloatingCharacter(QtWidgets.QWidget):
-    def show_chat_message(self, message, duration_ms=8000):
-        """Show message in a manga-style speech bubble"""
+    def show_chat_message(self, message, duration_ms=None):
+        """Show message in a manga-style speech bubble with auto-adjusted duration"""
+        # Calculate duration based on message length if not provided
+        if duration_ms is None:
+            # Base duration: 3 seconds
+            # Add 50ms per character (average reading speed ~200 words/min = ~20 chars/sec)
+            # Minimum 2 seconds, maximum 20 seconds
+            char_count = len(message)
+            calculated_duration = 3000 + (char_count * 50)
+            duration_ms = max(2000, min(calculated_duration, 20000))
+        
         dialog = SpeechBubble(self, message, duration_ms)
         dialog.show_bubble()
 
     def show_question_dialog(self):
-        dialog = QtWidgets.QDialog(self)
-        dialog.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Tool)
-        dialog.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        dialog.setStyleSheet("""
-            QDialog { background: transparent; }
-            QLabel {
-                background: #e1ffc7;
-                border-radius: 16px;
-                padding: 12px 18px;
-                color: #222;
-                font-size: 16px;
-                border: 2px solid #b2f2a5;
-                min-width: 220px;
-                max-width: 420px;
-            }
-            QLineEdit {
-                background: #fff;
-                border-radius: 12px;
-                font-size: 15px;
-                padding: 8px 12px;
-                border: 1.5px solid #b2f2a5;
-                color: #222;
-            }
-        """)
-        layout = QtWidgets.QVBoxLayout(dialog)
-        layout.setContentsMargins(10, 10, 10, 10)
-        label = QtWidgets.QLabel("Ask Chika:")
-        label.setWordWrap(True)
-        layout.addWidget(label)
-        input_box = QtWidgets.QLineEdit()
-        input_box.setPlaceholderText("Type your question...")
-        layout.addWidget(input_box)
-        input_box.setFocus()
-        def accept_if_enter():
-            if input_box.text().strip():
-                dialog.accept()
-        input_box.returnPressed.connect(accept_if_enter)
-        dialog.adjustSize()
-        # Always position above the character, even if window moves
-        global_pos = self.mapToGlobal(self.rect().center())
-        x = global_pos.x() - dialog.width() // 2
-        y = global_pos.y() - self.height() // 2 - dialog.height() - 8
-        screen_geom = QtWidgets.QApplication.primaryScreen().availableGeometry()
-        y = max(screen_geom.top(), y)
-        dialog.move(x, y)
+        """Show question input in a manga-style speech bubble"""
+        dialog = QuestionBubble(self)
+        dialog.show_bubble()
         result = dialog.exec()
-        return input_box.text().strip() if result == QtWidgets.QDialog.Accepted else None
+        return dialog.get_input() if result == QtWidgets.QDialog.Accepted else None
+
     def __init__(self):
         super().__init__()
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.Tool)
@@ -372,7 +483,7 @@ class FloatingCharacter(QtWidgets.QWidget):
 
     # ---------- Interaction & Movement ----------
     def _create_circular_menu(self):
-        """Create circular menu buttons around the character as separate top-level widgets"""
+        """Create circular menu buttons hovering over the character at 10, 11, and 12 o'clock positions"""
         if self.menu_visible:
             self._hide_circular_menu()
             return
@@ -382,13 +493,14 @@ class FloatingCharacter(QtWidgets.QWidget):
         # Get the center position of the character window in global coordinates
         global_center = self.mapToGlobal(self.rect().center())
         center_x, center_y = global_center.x(), global_center.y()
-        radius = 130  # Distance from character center
+        radius = 100  # Closer distance to keep buttons over the GIF
         
-        # Define buttons: (angle_degrees, label, icon_text, callback)
+        # Define buttons at 10, 11, and 12 o'clock: (angle_degrees, label, icon_text, callback)
+        # Angles: 240° (10 o'clock), 270° (12 o'clock), 300° (11 o'clock)
         buttons_config = [
-            (0, "Prompt", "💬", self._on_prompt_click),
-            (120, "Move", "✋", self._on_move_click),
-            (240, "Settings", "⚙️", self._on_settings_click),
+            (0, "Prompt", "💬", self._on_prompt_click),      # 10 o'clock
+            (310, "Settings", "⚙️", self._on_settings_click),   # 12 o'clock (top)
+            (260, "Move", "✋", self._on_move_click),            # 11 o'clock
         ]
         
         for angle, label, icon, callback in buttons_config:
@@ -459,26 +571,39 @@ class FloatingCharacter(QtWidgets.QWidget):
             self.setCursor(QtCore.Qt.OpenHandCursor)
 
     def _on_settings_click(self):
-        """Open settings manager"""
+        """Focus on the existing settings manager instead of opening a new one"""
         self._hide_circular_menu()
-        import subprocess
         
-        # Fix the settings path - go to src/ui/settings_manager.py
-        settings_path = Path(__file__).parent / "settings_manager.py"
-        
-        print(f"Looking for settings manager at: {settings_path}")
-        print(f"File exists: {settings_path.exists()}")
-        
-        if settings_path.exists():
-            try:
-                subprocess.Popen([sys.executable, str(settings_path)])
-                self.show_chat_message("Opening settings...", duration_ms=2000)
-            except Exception as e:
-                self.show_chat_message(f"Error: {e}", duration_ms=3000)
-                print(f"Error launching settings: {e}")
-        else:
-            self.show_chat_message("Settings manager not found!", duration_ms=3000)
-            print(f"Settings manager not found at: {settings_path}")
+        try:
+            # Try to find the settings manager process
+            import psutil
+            current_pid = os.getpid()
+            settings_found = False
+            
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    cmdline = proc.info.get('cmdline')
+                    if cmdline and any('settings_manager.py' in str(arg) for arg in cmdline):
+                        if proc.info['pid'] != current_pid:
+                            settings_found = True
+                            self.show_chat_message(
+                                "Settings window is already open! Please check your taskbar.", 
+                                duration_ms=3000
+                            )
+                            break
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            
+            if not settings_found:
+                # No settings manager running, inform user
+                self.show_chat_message(
+                    "Please launch the settings manager separately to configure options.",
+                    duration_ms=3000
+                )
+                
+        except Exception as e:
+            self.show_chat_message(f"Error: {e}", duration_ms=3000)
+            print(f"Error checking for settings manager: {e}")
         
     def mousePressEvent(self, event: QtGui.QMouseEvent):
         if event.button() == QtCore.Qt.LeftButton:
