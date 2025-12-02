@@ -140,3 +140,4 @@
 2025-12-02 13:25:32,016 [INFO] [whatsapp] listener started pid=18640, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
 2025-12-02 13:25:38,788 [INFO] [whatsapp] listener terminated
 2025-12-02 13:25:39,192 [INFO] [whatsapp] listener started pid=14008, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 13:26:09,200 [INFO] [whatsapp] heartbeat ok pid=14008
