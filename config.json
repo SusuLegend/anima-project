@@ -1,11 +1,11 @@
 {
   "llm": {
     "model": "gemini",
-    "system_prompt": "You are a friendly and supportive AI companion. Be warm, empathetic, and engaging in your responses.\n\n",
+    "system_prompt": "You are a friendly and supportive AI companion. Be warm, empathetic, and engaging in your responses.\n\nFormat: Keep your response strictly under 30 words. If you cannot answer, deny appropriately. Do not use markdown in your response.",
     "timeout": 30.0
   },
   "ui": {
-    "character_gif": "D:/CAPSTONE/anima-project/assets/expression3.gif",
+    "character_gif": "E:/anima-capstone/assets/expression4.gif",
     "window_opacity": 1.0,
     "window_size": [
       200,
