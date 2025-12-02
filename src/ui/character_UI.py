@@ -794,9 +794,20 @@ class FloatingCharacter(QtWidgets.QWidget):
         if text:
             self.show_chat_message("Thinking...", duration_ms=1200)
             QtWidgets.QApplication.processEvents()
-            if not hasattr(self, 'llm_convo'):
-                self.llm_convo = GeminiIntegration(system_prompt=CONFIG["llm"].get("system_prompt"))
-            reply = self.llm_convo.get_response(text)
+            try:
+                # Send prompt to MCP server's /gemini_chat endpoint
+                mcp_url = "http://127.0.0.1:8576/gemini_chat"
+                payload = {
+                    "prompt": text,
+                    "system_prompt": CONFIG["llm"].get("system_prompt")
+                }
+                response = requests.post(mcp_url, json=payload, timeout=30)
+                if response.status_code == 200:
+                    reply = response.json().get("reply", "(No reply)")
+                else:
+                    reply = f"Error: MCP server returned status {response.status_code}\n{response.text}"
+            except Exception as e:
+                reply = f"Error contacting MCP server: {e}"
             self._show_llm_reply(reply)
 
     def _on_move_click(self):

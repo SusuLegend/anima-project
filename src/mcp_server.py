@@ -1,9 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_mcp import FastApiMCP 
 from src.database.rag_pipeline import RAGPipeline
 from src.ai_brain.gemini_integration import GeminiIntegration
 from src.ai_brain.function_calling import llm_tools
+from fastapi import Request
 import os
 from dotenv import load_dotenv
 
@@ -41,10 +43,9 @@ rag_pipeline = RAGPipeline(
 )
 
 gemini_api_key = os.getenv('GEMINI_API_KEY')
-gemini_system_prompt = os.getenv('GEMINI_SYSTEM_PROMPT', 'You are a helpful assistant.')
-gemini_ai = GeminiIntegration(api_key=gemini_api_key, system_prompt=gemini_system_prompt)
 
-def get_intent_function_name(prompt: str, api_key: str = None, system_prompt: str = None):
+
+def get_intent_function_name(prompt: str, gemini_ai: GeminiIntegration) -> str:
     # Compose a prompt for Gemini to select the function
     tool_list = "\n".join([f"{tool['name']}: {tool['description']}" for tool in llm_tools.get_schema()])
     selection_prompt = (
@@ -56,11 +57,49 @@ def get_intent_function_name(prompt: str, api_key: str = None, system_prompt: st
     return function_name
 
 
-# Gemini chat endpoint
 @api.post("/gemini_chat")
-def gemini_chat(prompt: str):
-    """Get a response from Gemini AI."""
-    reply = gemini_ai.get_response(prompt)
+async def gemini_chat(request: Request):
+    """Get a response from Gemini AI, using intent-based tool calling."""
+    data = await request.json()
+    prompt = data.get("prompt", "")
+    system_prompt = data.get("system_prompt", None)
+
+    gemini_ai = GeminiIntegration(api_key=gemini_api_key, system_prompt=system_prompt)
+    tool_name = get_intent_function_name(prompt, gemini_ai)
+
+    # If no tool intent, just return Gemini's chat reply
+    if tool_name.lower() == "none" or tool_name.strip() == "":
+        reply = gemini_ai.get_response(prompt)
+        return {"reply": reply}
+
+    # Step 2: Call the corresponding tool function
+    import requests
+    base_url = str(request.base_url).rstrip("/")
+    tool_result = None
+    if tool_name == "get_gmail":
+        resp = requests.get(f"{base_url}/tools/gmail")
+        tool_result = resp.json()
+    elif tool_name == "get_outlook":
+        resp = requests.get(f"{base_url}/tools/get_outlook")
+        tool_result = resp.json()
+    elif tool_name == "get_tasks":
+        resp = requests.get(f"{base_url}/tools/get_tasks")
+        tool_result = resp.json()
+    elif tool_name == "get_calendar_events":
+        resp = requests.get(f"{base_url}/tools/get_calendar_events")
+        tool_result = resp.json()
+    elif tool_name == "get_whatsapp_messages":
+        resp = requests.get(f"{base_url}/tools/whatsapp")
+        tool_result = resp.json()
+    else:
+        return JSONResponse(
+            status_code=422,
+            content={"error": f"No tool intent detected or unknown tool: {tool_name}"},
+        )
+
+    # Step 3: Compose final prompt for Gemini
+    full_prompt = f"{prompt}\n\nTool result from {tool_name}:\n{tool_result}"
+    reply = gemini_ai.get_response(full_prompt)
     return {"reply": reply}
 
 # RAG search endpoint
