@@ -71,8 +71,10 @@ def rag_search(query: str, top_k: int = 3):
     return {"results": results}
 
 @api.get("/")
-def status():
-    return {"status": "running"}
+def root():
+    return {"message": "Unified MCP API is running."}
+
+
 
 if __name__ == "__main__":
     import uvicorn

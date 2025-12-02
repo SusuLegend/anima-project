@@ -21,6 +21,7 @@ import psutil
 import subprocess
 import requests
 import time
+import logging
 from pathlib import Path
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Qt, Signal, QThread
@@ -29,6 +30,9 @@ from PySide6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QComboBox, QSpinBox, QDoubleSpinBox,
     QTextEdit, QFileDialog, QTabWidget, QGroupBox, QCheckBox, QMessageBox, QDialog
 )
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 # Default configuration
 DEFAULT_CONFIG = {
@@ -69,6 +73,7 @@ class SettingsManager(QMainWindow):
         self.tool_server_started_by_us = False  # Track if we started the server
         self.init_ui()
         # Check and start tool server after UI is initialized
+        logging.info("Checking tool server status...")
         QtCore.QTimer.singleShot(500, self.ensure_tool_server_running)
         
     def init_ui(self):
@@ -666,32 +671,44 @@ class SettingsManager(QMainWindow):
     def is_tool_server_running(self):
         """Check if the tool server is running by making a health check request"""
         try:
-            response = requests.get(f"{TOOL_SERVER_URL}/", timeout=2)
+            response = requests.get(f"{TOOL_SERVER_URL}/", timeout=10)
+            
             return response.status_code == 200
         except (requests.RequestException, Exception):
+            logging.info("error checking tool server status")
             return False
     
     def start_tool_server(self):
         """Start the tool server in the background"""
         try:
-            tools_dir = PROJECT_ROOT / "src" / "tools"
+            tools_dir = PROJECT_ROOT /"src"
             tools_app = tools_dir / "mcp_server.py"
             
             if not tools_app.exists():
+                logging.error(f"Tool server script not found: {tools_app}")
                 self.statusBar().showMessage(f"⚠️ Tool server script not found: {tools_app}", 5000)
                 return False
             
             # Start uvicorn server in background
             self.tool_server_process = subprocess.Popen(
-                [sys.executable, "-m", "uvicorn", "mcp_server:app", "--host", "127.0.0.1", "--port", str(TOOL_SERVER_PORT)],
-                cwd=str(tools_dir),
+                [sys.executable, "-m", "uvicorn", "src.mcp_server:api", "--host", "127.0.0.1", "--port", str(TOOL_SERVER_PORT)],
+                cwd=str(PROJECT_ROOT),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             )
-            
+            logging.info(f"Started tool server with PID {self.tool_server_process.pid}")
             self.tool_server_started_by_us = True  # Mark that we started it
             self.statusBar().showMessage("🔧 Starting tool server...", 2000)
+            
+            # After starting the process
+            time.sleep(2)  # Give the server a moment to start
+            if self.tool_server_process:
+                err_output = self.tool_server_process.stderr.read().decode(errors="ignore")
+                if err_output:
+                    print("Tool server error output:\n", err_output)
+                    logging.error(f"Tool server error output:\n{err_output}")
+            
             return True
             
         except Exception as e:
@@ -714,6 +731,7 @@ class SettingsManager(QMainWindow):
     def verify_tool_server_started(self):
         """Verify that the tool server started successfully"""
         max_retries = 5
+        logging.info("Verifying tool server startup...")
         for i in range(max_retries):
             if self.is_tool_server_running():
                 self.statusBar().showMessage(f"✅ Tool server started successfully on port {TOOL_SERVER_PORT}", 5000)

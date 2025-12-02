@@ -78,7 +78,7 @@ class RAGPipeline:
         # Create or connect to index
         self._initialize_index()
         
-        print(f"✅ RAG Pipeline initialized with index: {index_name}")
+        print(f"RAG Pipeline initialized with index: {index_name}")
     
     def _initialize_index(self):
         """Create or connect to Pinecone index"""
@@ -95,9 +95,9 @@ class RAGPipeline:
                     region=self.region
                 )
             )
-            print(f"✅ Index {self.index_name} created")
+            print(f"Index {self.index_name} created")
         else:
-            print(f"✅ Connected to existing index: {self.index_name}")
+            print(f"Connected to existing index: {self.index_name}")
         
         # Connect to index
         self.index = self.pc.Index(self.index_name)
@@ -385,17 +385,17 @@ class RAGPipeline:
     def delete_document(self, doc_id: str):
         """Delete a document by ID"""
         self.index.delete(ids=[doc_id])
-        print(f"✅ Deleted document: {doc_id}")
+        print(f" Deleted document: {doc_id}")
     
     def delete_documents(self, doc_ids: List[str]):
         """Delete multiple documents"""
         self.index.delete(ids=doc_ids)
-        print(f"✅ Deleted {len(doc_ids)} documents")
+        print(f" Deleted {len(doc_ids)} documents")
     
     def delete_all(self):
         """Delete all documents from index"""
         self.index.delete(delete_all=True)
-        print(f"✅ Deleted all documents from index: {self.index_name}")
+        print(f" Deleted all documents from index: {self.index_name}")
     
     def get_stats(self) -> Dict[str, Any]:
         """Get index statistics"""
@@ -452,9 +452,9 @@ class RAGPipeline:
                     'metadata': existing_metadata
                 }]
             )
-            print(f"✅ Updated metadata for: {doc_id}")
+            print(f" Updated metadata for: {doc_id}")
         else:
-            print(f"❌ Document not found: {doc_id}")
+            print(f" Document not found: {doc_id}")
     
     def generate_rag_context(
         self,
