@@ -24,4 +24,4 @@ src/tools/whatsapp_listener/auth/
 # end managed
 
 **/*.log
-**/message.json
+**/messages.json

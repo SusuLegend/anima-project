@@ -66,6 +66,7 @@ class SettingsManager(QMainWindow):
         self.config = self.load_config()
         self.running_process = None
         self.tool_server_process = None
+        self.tool_server_started_by_us = False  # Track if we started the server
         self.init_ui()
         # Check and start tool server after UI is initialized
         QtCore.QTimer.singleShot(500, self.ensure_tool_server_running)
@@ -689,6 +690,7 @@ class SettingsManager(QMainWindow):
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             )
             
+            self.tool_server_started_by_us = True  # Mark that we started it
             self.statusBar().showMessage("🔧 Starting tool server...", 2000)
             return True
             
@@ -700,6 +702,7 @@ class SettingsManager(QMainWindow):
         """Ensure the tool server is running, start it if not"""
         if self.is_tool_server_running():
             self.statusBar().showMessage("✅ Tool server is running", 3000)
+            self.tool_server_started_by_us = False  # Already running, we didn't start it
             return
         
         # Server not running, start it
@@ -728,6 +731,69 @@ class SettingsManager(QMainWindow):
             "- Required dependencies are installed (uvicorn, fastapi)\n"
             "- The tools_app.py file exists in src/tools/"
         )
+    
+    def stop_tool_server(self):
+        """Stop the tool server if we started it"""
+        if not self.tool_server_started_by_us:
+            return  # Don't stop a server we didn't start
+        
+        try:
+            # Terminate the process we started
+            if self.tool_server_process:
+                self.tool_server_process.terminate()
+                try:
+                    self.tool_server_process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    self.tool_server_process.kill()
+                self.tool_server_process = None
+            
+            # Also kill any uvicorn processes on our port (cleanup orphaned processes)
+            current_pid = os.getpid()
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    if proc.info['pid'] == current_pid:
+                        continue
+                    
+                    cmdline = proc.info.get('cmdline') or []
+                    # Check if it's a uvicorn process for tools_app on our port
+                    if any('uvicorn' in str(arg).lower() for arg in cmdline) and \
+                       any('tools_app' in str(arg) for arg in cmdline):
+                        proc.terminate()
+                        proc.wait(timeout=3)
+                        continue
+                    
+                    # Also check if process is listening on our port
+                    try:
+                        connections = proc.connections()
+                        for conn in connections:
+                            if hasattr(conn, 'laddr') and conn.laddr.port == TOOL_SERVER_PORT:
+                                if any('python' in str(arg).lower() for arg in cmdline):
+                                    proc.terminate()
+                                    proc.wait(timeout=3)
+                                    break
+                    except (psutil.AccessDenied, AttributeError):
+                        pass
+                                
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
+                    pass
+                    
+        except Exception as e:
+            print(f"Error stopping tool server: {e}")
+    
+    def closeEvent(self, event):
+        """Handle window close event - cleanup tool server"""
+        # Stop tool server if we started it
+        self.stop_tool_server()
+        
+        # Stop the main application if it's running
+        if self.running_process:
+            try:
+                self.running_process.terminate()
+                self.running_process.wait(timeout=3)
+            except Exception:
+                pass
+        
+        event.accept()
 
 
 def main():
