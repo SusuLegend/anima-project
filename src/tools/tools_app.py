@@ -122,21 +122,64 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# New Outlook endpoint THIS ONLY WORKING ONE
+# New Outlook endpoint - returns emails, events, and tasks
 @app.get("/get_outlook")
 def get_outlook():
 	try:
 		api_fetch = importlib.import_module("src.tools.microsoft_listener.api_fetch")
-		return api_fetch.get_new_emails()
+		emails = api_fetch.get_new_emails()
+		events_data = api_fetch.get_upcoming_events()
+		tasks_data = api_fetch.get_pending_tasks()
+		return {
+			"status": "success",
+			"emails": emails,
+			"events": events_data.get("events", []),
+			"reminders": events_data.get("reminders", []),
+			"tasks": tasks_data.get("tasks", []),
+			"new_tasks": tasks_data.get("new_tasks", [])
+		}
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 	
-# Weather info endpoint
+# Weather info endpoint - requires city, optional days & formatted
 @app.get("/weather")
-def get_weather():
+def get_weather(city: str, days: int = 1, formatted: bool = False):
 	try:
 		weather_info = importlib.import_module("src.tools.other_listener.weather_info")
-		return weather_info.get_weather_data()  # You must implement get_weather_data in weather_info.py
+		# Clamp days between 1 and 7 for reasonable responses
+		days = max(1, min(days, 7))
+		if formatted:
+			# Return a readable string combining current + forecast
+			text = weather_info.get_weather_forecast(city, days=days)
+			return {"city": city, "days": days, "formatted": True, "text": text}
+		else:
+			# Return structured JSON using WeatherFetcher
+			fetcher = weather_info.WeatherFetcher()
+			data = fetcher.get_weather_by_location(city, forecast_days=days)
+			if isinstance(data, dict) and data.get("error"):
+				raise HTTPException(status_code=404, detail=data["error"])
+			return data
+	except HTTPException:
+		raise
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=str(e))
+
+# Web search endpoint
+@app.get("/search")
+def search(query: str, max_results: int = 5, formatted: bool = False, region: str = "wt-wt"):
+	try:
+		web_search_mod = importlib.import_module("src.tools.other_listener.web_search")
+		max_results = max(1, min(max_results, 20))
+		# basic region sanity: ddg expects patterns like 'us-en', 'au-en', 'wt-wt'
+		region = (region or "wt-wt").strip()
+		if formatted:
+			# Use helper with region support
+			text = web_search_mod.web_search(query, max_results=max_results, region=region)
+			return {"query": query, "formatted": True, "text": text}
+		else:
+			searcher = web_search_mod.WebSearcher()
+			results = searcher.search(query, max_results=max_results, region=region)
+			return {"query": query, "results": results}
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 

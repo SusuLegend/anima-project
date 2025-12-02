@@ -558,5 +558,25 @@
     "groupImage": null,
     "remoteJid": "79152656965753@lid",
     "mentionedNames": []
+  },
+  {
+    "time": "12/2/2025, 12:58:17 PM",
+    "chatType": "Personal",
+    "chatName": "79152656965753@lid",
+    "senderName": "Tran Hung Dat",
+    "text": "testing",
+    "groupImage": null,
+    "remoteJid": "79152656965753@lid",
+    "mentionedNames": []
+  },
+  {
+    "time": "12/2/2025, 1:24:50 PM",
+    "chatType": "Personal",
+    "chatName": "79152656965753@lid",
+    "senderName": "Tran Hung Dat",
+    "text": "test",
+    "groupImage": null,
+    "remoteJid": "79152656965753@lid",
+    "mentionedNames": []
   }
 ]

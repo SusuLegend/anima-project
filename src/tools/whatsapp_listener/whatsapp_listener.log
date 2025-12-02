@@ -46,3 +46,96 @@
 2025-12-02 12:38:35,397 [INFO] [whatsapp] listener started pid=28364, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
 2025-12-02 12:39:05,390 [INFO] [whatsapp] heartbeat ok pid=28364
 2025-12-02 12:39:32,475 [INFO] [whatsapp] listener terminated
+2025-12-02 12:51:59,559 [INFO] [whatsapp] listener started pid=27796, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:52:29,565 [INFO] [whatsapp] heartbeat ok pid=27796
+2025-12-02 12:52:59,565 [INFO] [whatsapp] heartbeat ok pid=27796
+2025-12-02 12:53:29,572 [INFO] [whatsapp] heartbeat ok pid=27796
+2025-12-02 12:53:59,581 [INFO] [whatsapp] heartbeat ok pid=27796
+2025-12-02 12:54:15,345 [INFO] [whatsapp] listener terminated
+2025-12-02 12:54:15,797 [INFO] [whatsapp] listener started pid=26156, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:54:26,501 [INFO] [whatsapp] listener terminated
+2025-12-02 12:54:26,908 [INFO] [whatsapp] listener started pid=10844, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:54:37,726 [INFO] [whatsapp] listener terminated
+2025-12-02 12:54:38,139 [INFO] [whatsapp] listener started pid=12336, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:55:08,148 [INFO] [whatsapp] heartbeat ok pid=12336
+2025-12-02 12:55:38,152 [INFO] [whatsapp] heartbeat ok pid=12336
+2025-12-02 12:56:08,172 [INFO] [whatsapp] heartbeat ok pid=12336
+2025-12-02 12:56:38,195 [INFO] [whatsapp] heartbeat ok pid=12336
+2025-12-02 12:56:48,691 [INFO] [whatsapp] listener terminated
+2025-12-02 12:56:49,135 [INFO] [whatsapp] listener started pid=28368, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:57:19,152 [INFO] [whatsapp] heartbeat ok pid=28368
+2025-12-02 12:57:43,409 [INFO] [whatsapp] listener terminated
+2025-12-02 12:57:53,891 [INFO] [whatsapp] listener started pid=4876, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:58:23,884 [INFO] [whatsapp] heartbeat ok pid=4876
+2025-12-02 12:58:53,880 [INFO] [whatsapp] heartbeat ok pid=4876
+2025-12-02 12:59:23,879 [INFO] [whatsapp] heartbeat ok pid=4876
+2025-12-02 12:59:43,860 [INFO] [whatsapp] listener terminated
+2025-12-02 12:59:44,300 [INFO] [whatsapp] listener started pid=25480, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 13:00:04,756 [INFO] [whatsapp] listener terminated
+2025-12-02 13:00:05,212 [INFO] [whatsapp] listener started pid=27828, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 13:00:35,227 [INFO] [whatsapp] heartbeat ok pid=27828
+2025-12-02 13:01:05,235 [INFO] [whatsapp] heartbeat ok pid=27828
+2025-12-02 13:01:35,240 [INFO] [whatsapp] heartbeat ok pid=27828
+2025-12-02 13:02:05,226 [INFO] [whatsapp] heartbeat ok pid=27828
+2025-12-02 13:02:20,223 [INFO] [whatsapp] listener terminated
+2025-12-02 13:02:20,631 [INFO] [whatsapp] listener started pid=21656, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 13:02:50,643 [INFO] [whatsapp] heartbeat ok pid=21656
+2025-12-02 13:03:20,645 [INFO] [whatsapp] heartbeat ok pid=21656
+2025-12-02 13:03:50,635 [INFO] [whatsapp] heartbeat ok pid=21656
+2025-12-02 13:04:20,656 [INFO] [whatsapp] heartbeat ok pid=21656
+2025-12-02 13:04:50,653 [INFO] [whatsapp] heartbeat ok pid=21656
+2025-12-02 13:05:20,653 [INFO] [whatsapp] heartbeat ok pid=21656
+2025-12-02 13:05:50,654 [INFO] [whatsapp] heartbeat ok pid=21656
+2025-12-02 13:05:56,668 [INFO] [whatsapp] listener terminated
+2025-12-02 13:05:57,064 [INFO] [whatsapp] listener started pid=22036, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 13:06:27,071 [INFO] [whatsapp] heartbeat ok pid=22036
+2025-12-02 13:06:57,064 [INFO] [whatsapp] heartbeat ok pid=22036
+2025-12-02 13:07:27,060 [INFO] [whatsapp] heartbeat ok pid=22036
+2025-12-02 13:07:57,070 [INFO] [whatsapp] heartbeat ok pid=22036
+2025-12-02 13:08:27,071 [INFO] [whatsapp] heartbeat ok pid=22036
+2025-12-02 13:08:57,060 [INFO] [whatsapp] heartbeat ok pid=22036
+2025-12-02 13:09:23,629 [INFO] [whatsapp] listener terminated
+2025-12-02 13:09:24,064 [INFO] [whatsapp] listener started pid=9684, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 13:09:54,061 [INFO] [whatsapp] heartbeat ok pid=9684
+2025-12-02 13:10:24,077 [INFO] [whatsapp] heartbeat ok pid=9684
+2025-12-02 13:10:54,075 [INFO] [whatsapp] heartbeat ok pid=9684
+2025-12-02 13:11:24,075 [INFO] [whatsapp] heartbeat ok pid=9684
+2025-12-02 13:11:54,093 [INFO] [whatsapp] heartbeat ok pid=9684
+2025-12-02 13:12:24,091 [INFO] [whatsapp] heartbeat ok pid=9684
+2025-12-02 13:12:54,099 [INFO] [whatsapp] heartbeat ok pid=9684
+2025-12-02 13:13:24,095 [INFO] [whatsapp] heartbeat ok pid=9684
+2025-12-02 13:13:43,803 [INFO] [whatsapp] listener terminated
+2025-12-02 13:13:44,224 [INFO] [whatsapp] listener started pid=26180, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 13:14:14,227 [INFO] [whatsapp] heartbeat ok pid=26180
+2025-12-02 13:14:44,234 [INFO] [whatsapp] heartbeat ok pid=26180
+2025-12-02 13:15:14,219 [INFO] [whatsapp] heartbeat ok pid=26180
+2025-12-02 13:15:44,224 [INFO] [whatsapp] heartbeat ok pid=26180
+2025-12-02 13:16:14,241 [INFO] [whatsapp] heartbeat ok pid=26180
+2025-12-02 13:16:44,215 [INFO] [whatsapp] heartbeat ok pid=26180
+2025-12-02 13:17:14,222 [INFO] [whatsapp] heartbeat ok pid=26180
+2025-12-02 13:17:44,227 [INFO] [whatsapp] heartbeat ok pid=26180
+2025-12-02 13:18:14,233 [INFO] [whatsapp] heartbeat ok pid=26180
+2025-12-02 13:18:44,240 [INFO] [whatsapp] heartbeat ok pid=26180
+2025-12-02 13:19:14,236 [INFO] [whatsapp] heartbeat ok pid=26180
+2025-12-02 13:19:44,238 [INFO] [whatsapp] heartbeat ok pid=26180
+2025-12-02 13:20:14,229 [INFO] [whatsapp] heartbeat ok pid=26180
+2025-12-02 13:20:26,689 [INFO] [whatsapp] listener terminated
+2025-12-02 13:20:27,133 [INFO] [whatsapp] listener started pid=6908, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 13:20:57,122 [INFO] [whatsapp] heartbeat ok pid=6908
+2025-12-02 13:21:27,129 [INFO] [whatsapp] heartbeat ok pid=6908
+2025-12-02 13:21:57,130 [INFO] [whatsapp] heartbeat ok pid=6908
+2025-12-02 13:22:08,368 [INFO] [whatsapp] listener terminated
+2025-12-02 13:22:08,775 [INFO] [whatsapp] listener started pid=27088, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 13:22:38,801 [INFO] [whatsapp] heartbeat ok pid=27088
+2025-12-02 13:23:08,812 [INFO] [whatsapp] heartbeat ok pid=27088
+2025-12-02 13:23:38,832 [INFO] [whatsapp] heartbeat ok pid=27088
+2025-12-02 13:24:08,826 [INFO] [whatsapp] heartbeat ok pid=27088
+2025-12-02 13:24:38,834 [INFO] [whatsapp] heartbeat ok pid=27088
+2025-12-02 13:25:08,846 [INFO] [whatsapp] heartbeat ok pid=27088
+2025-12-02 13:25:17,828 [INFO] [whatsapp] listener terminated
+2025-12-02 13:25:18,300 [INFO] [whatsapp] listener started pid=27984, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 13:25:28,645 [INFO] [whatsapp] listener terminated
+2025-12-02 13:25:29,089 [INFO] [whatsapp] listener started pid=7260, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 13:25:31,620 [INFO] [whatsapp] listener terminated
+2025-12-02 13:25:32,016 [INFO] [whatsapp] listener started pid=18640, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 13:25:38,788 [INFO] [whatsapp] listener terminated
