@@ -17,4 +17,4 @@ winsdk
 openwa
 torch
 msal
-gunicorn
+uvicorn
