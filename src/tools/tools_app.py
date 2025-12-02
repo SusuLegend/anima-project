@@ -12,6 +12,7 @@ import asyncio
 import time
 import logging
 
+# Choosing a non-standard port to minimize chance of port collision
 # Setup project root path - go up to the project root (anima-capstone)
 PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
 if str(PROJECT_ROOT) not in sys.path:
@@ -139,7 +140,7 @@ def get_outlook():
 	- Each call may return empty lists if nothing new or if Graph is unreachable.
 
 	Examples:
-	- http://127.0.0.1:8000/get_outlook
+	- http://127.0.0.1:8576/get_outlook
 	"""
 	'''
 	
@@ -175,8 +176,8 @@ def get_weather(city: str, days: int = 1, formatted: bool = False):
 	- On error (city not found or network issues), returns HTTP 404/500.
 
 	Examples:
-	- JSON:      http://127.0.0.1:8000/weather?city=Sydney&days=3
-	- Formatted: http://127.0.0.1:8000/weather?city=New%20York&days=2&formatted=true
+	- JSON:      http://127.0.0.1:8576/weather?city=Sydney&days=3
+	- Formatted: http://127.0.0.1:8576/weather?city=New%20York&days=2&formatted=true
 	"""
 	'''
 	
@@ -217,8 +218,8 @@ def search(query: str, max_results: int = 5, formatted: bool = False, region: st
 	- json: { results: [{ title, link, snippet }] }
 
 	Examples:
-	- JSON:      http://127.0.0.1:8000/search?query=best%20coffee&max_results=5&region=au-en
-	- Formatted: http://127.0.0.1:8000/search?query=fastapi%20tutorial&formatted=true&region=us-en
+	- JSON:      http://127.0.0.1:8576/search?query=best%20coffee&max_results=5&region=au-en
+	- Formatted: http://127.0.0.1:8576/search?query=fastapi%20tutorial&formatted=true&region=us-en
 	"""
 	'''
 	
@@ -249,7 +250,7 @@ def get_whatsapp():
 	- If no messages yet or file missing, returns an empty list and status note.
 
 	Examples:
-	- http://127.0.0.1:8000/whatsapp
+	- http://127.0.0.1:8576/whatsapp
 	"""
 	try:
 		# Ensure listener running (auto-restart if crashed)
@@ -282,7 +283,7 @@ def whatsapp_health():
 	- restart_count: number of auto‑restarts performed by heartbeat
 
 	Examples:
-	- http://127.0.0.1:8000/whatsapp/health
+	- http://127.0.0.1:8576/whatsapp/health
 	"""
 	alive = WHATSAPP_PROC is not None and WHATSAPP_PROC.poll() is None
 	pid = WHATSAPP_PROC.pid if alive and WHATSAPP_PROC is not None else None

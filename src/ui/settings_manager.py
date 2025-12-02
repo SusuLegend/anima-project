@@ -18,6 +18,9 @@ import sys
 import json
 import os
 import psutil
+import subprocess
+import requests
+import time
 from pathlib import Path
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Qt, Signal, QThread
@@ -51,6 +54,8 @@ DEFAULT_CONFIG = {
 }
 
 CONFIG_PATH = Path(__file__).parent.parent.parent / "config.json"
+TOOL_SERVER_PORT = 8576
+TOOL_SERVER_URL = f"http://127.0.0.1:{TOOL_SERVER_PORT}"
 
 
 class SettingsManager(QMainWindow):
@@ -60,7 +65,10 @@ class SettingsManager(QMainWindow):
         super().__init__()
         self.config = self.load_config()
         self.running_process = None
+        self.tool_server_process = None
         self.init_ui()
+        # Check and start tool server after UI is initialized
+        QtCore.QTimer.singleShot(500, self.ensure_tool_server_running)
         
     def init_ui(self):
         """Initialize the user interface"""
@@ -653,6 +661,73 @@ class SettingsManager(QMainWindow):
                     "Stop Error",
                     f"Failed to stop application:\n{e}"
                 )
+    
+    def is_tool_server_running(self):
+        """Check if the tool server is running by making a health check request"""
+        try:
+            response = requests.get(f"{TOOL_SERVER_URL}/", timeout=2)
+            return response.status_code == 200
+        except (requests.RequestException, Exception):
+            return False
+    
+    def start_tool_server(self):
+        """Start the tool server in the background"""
+        try:
+            tools_dir = Path(__file__).parent.parent / "tools"
+            tools_app = tools_dir / "tools_app.py"
+            
+            if not tools_app.exists():
+                self.statusBar().showMessage(f"⚠️ Tool server script not found: {tools_app}", 5000)
+                return False
+            
+            # Start uvicorn server in background
+            self.tool_server_process = subprocess.Popen(
+                [sys.executable, "-m", "uvicorn", "tools_app:app", "--host", "127.0.0.1", "--port", str(TOOL_SERVER_PORT)],
+                cwd=str(tools_dir),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+            )
+            
+            self.statusBar().showMessage("🔧 Starting tool server...", 2000)
+            return True
+            
+        except Exception as e:
+            self.statusBar().showMessage(f"⚠️ Failed to start tool server: {e}", 5000)
+            return False
+    
+    def ensure_tool_server_running(self):
+        """Ensure the tool server is running, start it if not"""
+        if self.is_tool_server_running():
+            self.statusBar().showMessage("✅ Tool server is running", 3000)
+            return
+        
+        # Server not running, start it
+        self.statusBar().showMessage("🔧 Tool server not detected, starting...", 3000)
+        if self.start_tool_server():
+            # Wait a bit and check again
+            QtCore.QTimer.singleShot(3000, self.verify_tool_server_started)
+    
+    def verify_tool_server_started(self):
+        """Verify that the tool server started successfully"""
+        max_retries = 5
+        for i in range(max_retries):
+            if self.is_tool_server_running():
+                self.statusBar().showMessage(f"✅ Tool server started successfully on port {TOOL_SERVER_PORT}", 5000)
+                return
+            time.sleep(1)
+        
+        # Failed to start
+        self.statusBar().showMessage(f"⚠️ Tool server failed to start on port {TOOL_SERVER_PORT}", 5000)
+        QMessageBox.warning(
+            self,
+            "Tool Server Warning",
+            f"The tool server could not be started on port {TOOL_SERVER_PORT}.\n\n"
+            "Some features may not work correctly. Please check if:\n"
+            "- The port is already in use\n"
+            "- Required dependencies are installed (uvicorn, fastapi)\n"
+            "- The tools_app.py file exists in src/tools/"
+        )
 
 
 def main():
@@ -693,7 +768,5 @@ def main():
     window = SettingsManager()
     window.show()
     sys.exit(app.exec())
-
-
 if __name__ == "__main__":
     main()
