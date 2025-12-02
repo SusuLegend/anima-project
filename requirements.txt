@@ -16,4 +16,5 @@ plyer
 winsdk
 openwa
 torch
-msal 
+msal
+gunicorn
