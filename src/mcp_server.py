@@ -177,12 +177,13 @@ async def execute_tool(tool_name: str, parameters: dict, base_url: str) -> dict:
 				query = parameters.get("query")
 				max_results = parameters.get("max_results", 3)
 				formatted = parameters.get("formatted", True)
+				region = parameters.get("region", "us-en")
 				
 				if not query:
 					return {"error": "Query parameter is required for search"}
 				
 				from urllib.parse import urlencode
-				params = urlencode({"query": query, "max_results": max_results, "formatted": formatted})
+				params = urlencode({"query": query, "max_results": max_results, "formatted": formatted, "region": region})
 				resp = await client.get(f"{base_url}/tools/search?{params}")
 				return resp.json()
 			

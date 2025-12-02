@@ -14,11 +14,11 @@ from typing import List, Dict, Optional
 
 # Try to import duckduckgo_search
 try:
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
     DDGS_AVAILABLE = True
 except ImportError:
     DDGS_AVAILABLE = False
-    print("Warning: duckduckgo-search not installed. Install with: pip install duckduckgo-search")
+    print("Warning: ddgs not installed. Install with: pip install ddgs")
 
 
 class WebSearcher:
@@ -34,7 +34,7 @@ class WebSearcher:
         self,
         query: str,
         max_results: int = 5,
-        region: str = "wt-wt"
+        region: str = "us-en"
     ) -> List[Dict[str, str]]:
         """
         Search the web for a query.

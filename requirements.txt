@@ -11,7 +11,7 @@ pinecone
 sentence-transformers
 ollama
 fastapi-mcp
-duckduckgo-search
+ddgs
 plyer
 winsdk
 openwa
