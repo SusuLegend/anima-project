@@ -1,19 +1,126 @@
 from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks
+from contextlib import asynccontextmanager
 from pydantic import BaseModel
 import importlib
 from pathlib import Path
+import sys
+import subprocess
+import json
+import os
+import asyncio
+import time
+import logging
 
-app = FastAPI()
+# Setup project root path - go up to the project root (anima-capstone)
+PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
+if str(PROJECT_ROOT) not in sys.path:
+	sys.path.insert(0, str(PROJECT_ROOT))
 
-# Gmail API endpoint
-@app.get("/gmail")
-def get_gmail():
+# Configure logging (after PROJECT_ROOT defined)
+logger = logging.getLogger("tools_app")
+if not logger.handlers:
+	logger.setLevel(logging.INFO)
+	log_path = PROJECT_ROOT / "src" / "tools" / "whatsapp_listener" / "whatsapp_listener.log"
 	try:
-		gmail_api = importlib.import_module("src.tools.google_listener.gmail_api")
-		return gmail_api.get_gmail_data()  # You must implement get_gmail_data in gmail_api.py
-	except Exception as e:
-		raise HTTPException(status_code=500, detail=str(e))
+		log_path.parent.mkdir(parents=True, exist_ok=True)
+	except Exception:
+		pass
+	fh = logging.FileHandler(log_path, encoding="utf-8")
+	fmt = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+	fh.setFormatter(fmt)
+	logger.addHandler(fh)
+	sh = logging.StreamHandler(sys.stdout)
+	sh.setFormatter(fmt)
+	logger.addHandler(sh)
 
+# Global handle for background Node WhatsApp listener
+WHATSAPP_PROC = None
+
+def start_whatsapp_listener():
+	"""Start the persistent Node.js WhatsApp listener if not already running."""
+	global WHATSAPP_PROC
+	if WHATSAPP_PROC and WHATSAPP_PROC.poll() is None:
+		return  # already running
+	listener_dir = PROJECT_ROOT / "src" / "tools" / "whatsapp_listener"
+	entry = listener_dir / "index.js"
+	if not entry.exists():
+		print(f"[whatsapp] index.js not found at {entry}")
+		return
+	creationflags = 0
+	startupinfo = None
+	if sys.platform == "win32":
+		startupinfo = subprocess.STARTUPINFO()
+		startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+		startupinfo.wShowWindow = subprocess.SW_HIDE
+		creationflags = subprocess.CREATE_NO_WINDOW
+	try:
+		# Convert Windows path to file:// URL for ESM import
+		from pathlib import Path
+		file_url = entry.as_uri()  # Converts to file:///E:/anima-capstone/...
+		node_cmd = [
+			"node",
+			"--input-type=module",
+			"-e",
+			f"import('{file_url}').then(m=>m.startWhatsAppListener()).catch(e=>console.error(e))"
+		]
+		# Capture output to log file for debugging
+		node_log = listener_dir / "node_output.log"
+		log_file = open(node_log, "a", encoding="utf-8")
+		WHATSAPP_PROC = subprocess.Popen(
+			node_cmd,
+			cwd=str(listener_dir),
+			stdout=log_file,
+			stderr=subprocess.STDOUT,
+			startupinfo=startupinfo,
+			creationflags=creationflags
+		)
+		logger.info(f"[whatsapp] listener started pid={WHATSAPP_PROC.pid}, log: {node_log}")
+	except Exception as e:
+			logger.error(f"[whatsapp] failed to start listener: {e}")
+
+def stop_whatsapp_listener():
+	"""Terminate the Node.js WhatsApp listener if running."""
+	global WHATSAPP_PROC
+	if WHATSAPP_PROC and WHATSAPP_PROC.poll() is None:
+		try:
+			WHATSAPP_PROC.terminate()
+			WHATSAPP_PROC.wait(timeout=5)
+			logger.info("[whatsapp] listener terminated")
+		except Exception as e:
+			logger.error(f"[whatsapp] error terminating listener: {e}")
+	WHATSAPP_PROC = None
+
+RESTART_COUNT = 0
+
+async def _heartbeat_task():
+	global RESTART_COUNT
+	while True:
+		await asyncio.sleep(30)
+		# poll() returns None if process is still running, non-None exit code if terminated
+		alive = WHATSAPP_PROC is not None and WHATSAPP_PROC.poll() is None
+		if alive:
+			pid = WHATSAPP_PROC.pid if WHATSAPP_PROC else None
+			logger.info(f"[whatsapp] heartbeat ok pid={pid}")
+		else:
+			logger.warning("[whatsapp] process not running, attempting restart")
+			start_whatsapp_listener()
+			# Check again after restart attempt
+			if WHATSAPP_PROC is not None and WHATSAPP_PROC.poll() is None:
+				RESTART_COUNT += 1
+				logger.info(f"[whatsapp] restart successful (count={RESTART_COUNT})")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+	start_whatsapp_listener()
+	heartbeat = asyncio.create_task(_heartbeat_task())
+	try:
+		yield
+	finally:
+		heartbeat.cancel()
+		stop_whatsapp_listener()
+
+app = FastAPI(lifespan=lifespan)
 
 # New Outlook endpoint THIS ONLY WORKING ONE
 @app.get("/get_outlook")
@@ -33,44 +140,39 @@ def get_weather():
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
 
-# WhatsApp endpoint
 @app.get("/whatsapp")
 def get_whatsapp():
+	"""Return collected WhatsApp messages from persistent listener."""
 	try:
-		import subprocess
-		import json
-		import os
-		import sys
-		
-		# Path to index.js
-		js_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "whatsapp_listener", "index.js"))
-		
-		# Configure subprocess to run without showing console window
-		startupinfo = None
-		if sys.platform == "win32":
-			startupinfo = subprocess.STARTUPINFO()
-			startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-			startupinfo.wShowWindow = subprocess.SW_HIDE
-		
-		_path = js_path.replace('\\', '/')
-		# Run Node.js and call getAllUnreadMessages, print result as JSON
-		result = subprocess.run([
-			"node",
-			"-e",
-			f"(async () => {{ const m = require('{_path}'); const res = await m.getAllUnreadMessages(); console.log(JSON.stringify(res)); }})()" \
-			], 
-		capture_output=True, 
-		text=True,
-		startupinfo=startupinfo,
-		creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-		)
-		
-		if result.returncode != 0:
-			raise Exception(result.stderr)
-		data = json.loads(result.stdout)
-		return data
+		# Ensure listener running (auto-restart if crashed)
+		start_whatsapp_listener()
+		messages_file = PROJECT_ROOT / "src" / "tools" / "whatsapp_listener" / "messages.json"
+		if not messages_file.exists():
+			return {"messages": [], "count": 0, "status": "listener starting or no messages yet"}
+		try:
+			with messages_file.open("r", encoding="utf-8") as f:
+				data = json.load(f)
+			if isinstance(data, list):
+				return {"messages": data, "count": len(data)}
+			elif isinstance(data, dict) and "messages" in data:
+				msgs = data.get("messages", [])
+				return {"messages": msgs, "count": len(msgs)}
+			else:
+				return {"messages": [], "count": 0, "status": "unexpected format"}
+		except Exception as read_err:
+			raise HTTPException(status_code=500, detail=f"Failed reading messages: {read_err}")
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/whatsapp/health")
+def whatsapp_health():
+	alive = WHATSAPP_PROC is not None and WHATSAPP_PROC.poll() is None
+	pid = WHATSAPP_PROC.pid if alive and WHATSAPP_PROC is not None else None
+	return {
+		"running": bool(alive),
+		"pid": pid,
+		"restart_count": RESTART_COUNT
+	}
 
 # Root endpoint
 @app.get("/")

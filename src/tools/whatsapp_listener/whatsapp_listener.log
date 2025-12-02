@@ -1,0 +1,48 @@
+2025-12-02 12:30:40,498 [INFO] [whatsapp] listener started pid=28656
+2025-12-02 12:30:51,052 [INFO] [whatsapp] listener started pid=20488
+2025-12-02 12:31:05,344 [INFO] [whatsapp] listener started pid=26776
+2025-12-02 12:31:11,447 [INFO] [whatsapp] listener started pid=27292
+2025-12-02 12:31:35,351 [WARNING] [whatsapp] process not running, attempting restart
+2025-12-02 12:31:35,353 [INFO] [whatsapp] listener started pid=25032
+2025-12-02 12:31:35,353 [INFO] [whatsapp] restart successful (count=1)
+2025-12-02 12:31:53,311 [INFO] [whatsapp] listener started pid=360
+2025-12-02 12:32:05,383 [WARNING] [whatsapp] process not running, attempting restart
+2025-12-02 12:32:05,385 [INFO] [whatsapp] listener started pid=28040
+2025-12-02 12:32:05,385 [INFO] [whatsapp] restart successful (count=2)
+2025-12-02 12:32:35,369 [WARNING] [whatsapp] process not running, attempting restart
+2025-12-02 12:32:35,371 [INFO] [whatsapp] listener started pid=14364
+2025-12-02 12:32:35,371 [INFO] [whatsapp] restart successful (count=3)
+2025-12-02 12:32:44,332 [INFO] [whatsapp] listener started pid=27640
+2025-12-02 12:33:09,224 [INFO] [whatsapp] listener started pid=27736
+2025-12-02 12:33:19,359 [INFO] [whatsapp] listener started pid=3332
+2025-12-02 12:33:39,221 [WARNING] [whatsapp] process not running, attempting restart
+2025-12-02 12:33:39,223 [INFO] [whatsapp] listener started pid=28508
+2025-12-02 12:33:39,224 [INFO] [whatsapp] restart successful (count=1)
+2025-12-02 12:34:08,427 [INFO] [whatsapp] listener started pid=25736, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:34:38,431 [WARNING] [whatsapp] process not running, attempting restart
+2025-12-02 12:34:38,433 [INFO] [whatsapp] listener started pid=24864, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:34:38,434 [INFO] [whatsapp] restart successful (count=1)
+2025-12-02 12:35:08,432 [WARNING] [whatsapp] process not running, attempting restart
+2025-12-02 12:35:08,434 [INFO] [whatsapp] listener started pid=12964, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:35:08,434 [INFO] [whatsapp] restart successful (count=2)
+2025-12-02 12:35:38,439 [WARNING] [whatsapp] process not running, attempting restart
+2025-12-02 12:35:38,442 [INFO] [whatsapp] listener started pid=2224, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:35:38,442 [INFO] [whatsapp] restart successful (count=3)
+2025-12-02 12:36:08,442 [WARNING] [whatsapp] process not running, attempting restart
+2025-12-02 12:36:08,444 [INFO] [whatsapp] listener started pid=21596, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:36:08,445 [INFO] [whatsapp] restart successful (count=4)
+2025-12-02 12:36:38,434 [WARNING] [whatsapp] process not running, attempting restart
+2025-12-02 12:36:38,437 [INFO] [whatsapp] listener started pid=27216, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:36:38,437 [INFO] [whatsapp] restart successful (count=5)
+2025-12-02 12:37:08,439 [WARNING] [whatsapp] process not running, attempting restart
+2025-12-02 12:37:08,441 [INFO] [whatsapp] listener started pid=6380, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:37:08,441 [INFO] [whatsapp] restart successful (count=6)
+2025-12-02 12:37:38,441 [WARNING] [whatsapp] process not running, attempting restart
+2025-12-02 12:37:38,443 [INFO] [whatsapp] listener started pid=14008, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:37:38,443 [INFO] [whatsapp] restart successful (count=7)
+2025-12-02 12:38:08,439 [WARNING] [whatsapp] process not running, attempting restart
+2025-12-02 12:38:08,441 [INFO] [whatsapp] listener started pid=23080, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:38:08,441 [INFO] [whatsapp] restart successful (count=8)
+2025-12-02 12:38:35,397 [INFO] [whatsapp] listener started pid=28364, log: E:\anima-capstone\src\tools\whatsapp_listener\node_output.log
+2025-12-02 12:39:05,390 [INFO] [whatsapp] heartbeat ok pid=28364
+2025-12-02 12:39:32,475 [INFO] [whatsapp] listener terminated
