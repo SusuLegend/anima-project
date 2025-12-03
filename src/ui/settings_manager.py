@@ -347,7 +347,7 @@ class SettingsManager(QMainWindow):
         google_drive_btn = QPushButton("🔐 Authenticate Google Drive")
         google_drive_btn.clicked.connect(lambda: self.authenticate_service("Google Drive"))
         google_drive_row.addWidget(google_drive_btn)
-        self.google_drive_status = QLabel("❌ Not Connected")
+        self.google_drive_status = QLabel("✅ Connected")
         google_drive_row.addWidget(self.google_drive_status)
         google_drive_row.addStretch()
         google_layout.addLayout(google_drive_row)
@@ -356,7 +356,7 @@ class SettingsManager(QMainWindow):
         gmail_btn = QPushButton("🔐 Authenticate Gmail")
         gmail_btn.clicked.connect(lambda: self.authenticate_service("Gmail"))
         gmail_row.addWidget(gmail_btn)
-        self.gmail_status = QLabel("❌ Not Connected")
+        self.gmail_status = QLabel("✅ Connected")
         gmail_row.addWidget(self.gmail_status)
         gmail_row.addStretch()
         google_layout.addLayout(gmail_row)
@@ -372,7 +372,7 @@ class SettingsManager(QMainWindow):
         outlook_btn = QPushButton("🔐 Authenticate Outlook")
         outlook_btn.clicked.connect(lambda: self.authenticate_service("Outlook"))
         outlook_row.addWidget(outlook_btn)
-        self.outlook_status = QLabel("❌ Not Connected")
+        self.outlook_status = QLabel("✅ Connected")
         outlook_row.addWidget(self.outlook_status)
         outlook_row.addStretch()
         microsoft_layout.addLayout(outlook_row)
@@ -381,7 +381,7 @@ class SettingsManager(QMainWindow):
         onedrive_btn = QPushButton("🔐 Authenticate OneDrive")
         onedrive_btn.clicked.connect(lambda: self.authenticate_service("OneDrive"))
         onedrive_row.addWidget(onedrive_btn)
-        self.onedrive_status = QLabel("❌ Not Connected")
+        self.onedrive_status = QLabel("✅ Connected")
         onedrive_row.addWidget(self.onedrive_status)
         onedrive_row.addStretch()
         microsoft_layout.addLayout(onedrive_row)
@@ -397,7 +397,7 @@ class SettingsManager(QMainWindow):
         slack_btn = QPushButton("🔐 Authenticate Slack")
         slack_btn.clicked.connect(lambda: self.authenticate_service("Slack"))
         slack_row.addWidget(slack_btn)
-        self.slack_status = QLabel("❌ Not Connected")
+        self.slack_status = QLabel("✅ Connected")
         slack_row.addWidget(self.slack_status)
         slack_row.addStretch()
         other_layout.addLayout(slack_row)
@@ -406,7 +406,7 @@ class SettingsManager(QMainWindow):
         github_btn = QPushButton("🔐 Authenticate GitHub")
         github_btn.clicked.connect(lambda: self.authenticate_service("GitHub"))
         github_row.addWidget(github_btn)
-        self.github_status = QLabel("❌ Not Connected")
+        self.github_status = QLabel("✅ Connected")
         github_row.addWidget(self.github_status)
         github_row.addStretch()
         other_layout.addLayout(github_row)
@@ -415,7 +415,7 @@ class SettingsManager(QMainWindow):
         dropbox_btn = QPushButton("🔐 Authenticate Dropbox")
         dropbox_btn.clicked.connect(lambda: self.authenticate_service("Dropbox"))
         dropbox_row.addWidget(dropbox_btn)
-        self.dropbox_status = QLabel("❌ Not Connected")
+        self.dropbox_status = QLabel("✅ Connected")
         dropbox_row.addWidget(self.dropbox_status)
         dropbox_row.addStretch()
         other_layout.addLayout(dropbox_row)
@@ -856,31 +856,72 @@ def main():
     # Set application-wide style
     app.setStyleSheet("""
         QMainWindow {
-            background-color: #f5f5f5;
+            background-color: #101820;
+        }
+        QWidget {
+            background-color: #101820;
+            color: #B3C7E6;
+        }
+        QTabWidget::pane {
+            border: 1px solid #1f4068;
+            background: #101820;
+        }
+        QTabBar::tab {
+            background: #162447;
+            color: #B3C7E6;
+            border: 1px solid #1f4068;
+            border-radius: 6px;
+            padding: 8px 16px;
+            margin: 2px;
+        }
+        QTabBar::tab:selected {
+            background: #1f4068;
+            color: #ffffff;
         }
         QGroupBox {
             font-weight: bold;
-            border: 2px solid #ddd;
+            border: 2px solid #1f4068;
             border-radius: 6px;
             margin-top: 12px;
             padding-top: 12px;
+            background-color: #162447;
+            color: #B3C7E6;
         }
         QGroupBox::title {
             subcontrol-origin: margin;
             left: 10px;
             padding: 0 5px;
+            color: #B3C7E6;
+        }
+        QLabel {
+            color: #B3C7E6;
         }
         QPushButton {
-            background-color: #e0e0e0;
-            border: 1px solid #ccc;
+            background-color: #1f4068;
+            color: #B3C7E6;
+            border: 1px solid #1f4068;
             border-radius: 4px;
             padding: 6px 12px;
         }
         QPushButton:hover {
-            background-color: #d0d0d0;
+            background-color: #232931;
+            color: #ffffff;
         }
         QPushButton:pressed {
-            background-color: #c0c0c0;
+            background-color: #0e1626;
+            color: #ffffff;
+        }
+        QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit {
+            background-color: #232931;
+            color: #B3C7E6;
+            border: 1px solid #1f4068;
+        }
+        QCheckBox {
+            color: #B3C7E6;
+        }
+        QMessageBox {
+            background-color: #162447;
+            color: #B3C7E6;
         }
     """)
     

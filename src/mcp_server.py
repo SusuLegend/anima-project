@@ -148,12 +148,13 @@ async def execute_tool(tool_name: str, parameters: dict, base_url: str) -> dict:
 				resp = await client.get(f"{base_url}/tools/outlook")
 				data = resp.json()
 				# Only return title for mails if present
-				filtered_mails = []
-				if "mails" in data:
-					for mail in data["mails"]:
-						title = mail.get("title") or mail.get("subject")
-						filtered_mails.append({"title": title})
-				return filtered_mails
+				filtered_emails = []
+				if "emails" in data:
+					for mail in data["emails"]:
+						subject = mail.get("subject") or mail.get("title")
+						sender = mail.get("sender") or mail.get("senderName") or mail.get("from")
+						filtered_emails.append({"subject": subject, "sender": sender})
+				return filtered_emails
 			
 			elif tool_name == "get_tasks":
 				# Outlook tasks are part of the outlook endpoint

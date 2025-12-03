@@ -233,16 +233,16 @@ class SpeechBubble(QtWidgets.QWidget):
         # Adjust max dimensions based on message length
         if message_length < 30:
             max_bubble_width = 250
-            max_bubble_height = 80
+            max_bubble_height = 120
         elif message_length > 100:
             max_bubble_width = 400
-            max_bubble_height = 120
+            max_bubble_height = 160
         elif message_length > 200:
             max_bubble_width = 500
-            max_bubble_height = 180
+            max_bubble_height = 220
         else:
             max_bubble_width = 600
-            max_bubble_height = 250
+            max_bubble_height = 290
         
         min_bubble_width = 160
         
@@ -505,8 +505,16 @@ class ToolsDialog(QtWidgets.QDialog):
             base_url = "http://127.0.0.1:8576/tools"
             
             if category == "gmail":
-                # Note: Gmail API not yet exposed via tools_app.py
-                result = "Gmail integration coming soon!"
+                try:
+                    response = requests.get(f"http://127.0.0.1:8576/tools/gmail", timeout=15)
+                    if response.status_code == 200:
+                        data = response.json()
+                        emails = data.get('emails', [])
+                        result = f"📬 {len(emails)} new emails"
+                    else:
+                        result = f"Error: {response.status_code}"
+                except Exception as e:
+                    result = f"Error: {str(e)}"
                 
             elif category == "outlook":
                 response = requests.get(f"{base_url}/outlook", timeout=50)
