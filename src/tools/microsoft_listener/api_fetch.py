@@ -9,7 +9,6 @@ sys.path.append(os.path.dirname(__file__))
 from login import login
 
 # Track seen items
-seen_emails = set()
 seen_events = set()
 seen_tasks = set()
 
@@ -18,15 +17,11 @@ def get_headers():
     return {"Authorization": f"Bearer {access_token}"}
 
 def get_new_emails():
-    global seen_emails
     try:
         url = "https://graph.microsoft.com/v1.0/me/mailFolders/Inbox/messages?$top=10&$orderby=receivedDateTime desc"
         resp = requests.get(url, headers=get_headers(), timeout=10).json().get("value", [])
         unread_emails = [mail for mail in resp if not mail.get("isRead", True)]
-        new_unread_emails = [mail for mail in unread_emails if mail["id"] not in seen_emails]
-        for mail in new_unread_emails:
-            seen_emails.add(mail["id"])
-        return new_unread_emails
+        return unread_emails
     except Exception as e:
         print(f"Error fetching emails: {e}")
         return []

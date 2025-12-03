@@ -678,6 +678,10 @@ class FloatingCharacter(QtWidgets.QWidget):
         if reason == QtWidgets.QSystemTrayIcon.ActivationReason.Trigger:
             self._toggle_visibility()
 
+    def _restart_movie(self):
+        if self.movie:
+            self.movie.start()
+
     def _build_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -700,6 +704,9 @@ class FloatingCharacter(QtWidgets.QWidget):
                     self.movie.setCacheMode(QtGui.QMovie.CacheAll)
                     self.movie.setSpeed(100)
                     self.char_label.setMovie(self.movie)
+                    # Ensure infinite looping: restart if stopped
+                    self.movie.finished.connect(self._restart_movie)
+
                     # Try to apply size immediately if frameRect is known
                     self._apply_size_mode()
                     # Ensure we apply once the first frame is available

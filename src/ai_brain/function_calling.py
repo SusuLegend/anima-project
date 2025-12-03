@@ -29,27 +29,31 @@ llm_tools = LLMToolRegistry()
 
 llm_tools.schema.append({
     "name": "get_gmail",
-    "description": "Get Gmail messages using the MCP server.",
+    "description": (
+        "Retrieve your most recent Gmail messages, including both read and unread emails. "
+        "Use this tool to check for new, recent, or unread emails, updates, notifications, or messages in your Gmail account. "
+        "You can use this tool to see if there are any updates or new messages in your inbox."
+    ),
     "parameters": {}
 })
 llm_tools.schema.append({
     "name": "get_outlook",
-    "description": "Get Outlook unread emails using the MCP server.",
+    "description": "Fetch unread emails from your Outlook inbox. Use this tool to check for new messages in your Outlook account.",
     "parameters": {}
 })
 llm_tools.schema.append({
     "name": "get_tasks",
-    "description": "Get Microsoft tasks using the MCP server.",
+    "description": "Retrieve your Microsoft To Do tasks. Use this tool to list your pending or completed tasks from your Microsoft account.",
     "parameters": {}
 })
 llm_tools.schema.append({
     "name": "get_calendar_events",
-    "description": "Get Microsoft calendar events using the MCP server.",
+    "description": "Fetch upcoming events from your Microsoft Outlook calendar. Use this tool to see your scheduled meetings and events.",
     "parameters": {}
 })
 llm_tools.schema.append({
     "name": "get_whatsapp_messages",
-    "description": "Get WhatsApp unread messages using the MCP server.",
+    "description": "Retrieve unread WhatsApp messages. Returns only new messages that have not been read yet, including sender and content. Use this tool to check for new WhatsApp notifications.",
     "parameters": {}
 })
 

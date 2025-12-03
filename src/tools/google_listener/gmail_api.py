@@ -93,12 +93,7 @@ def get_new_email_subject_and_body(service):
             'body': body,
             'sender': sender
         })
-        # Mark as read
-        service.users().messages().modify(
-            userId='me',
-            id=msg['id'],
-            body={'removeLabelIds': ['UNREAD']}
-        ).execute()
+        # Do NOT mark as read; keep email as unread
     return emails
 
 def reply_to_email(service, to_email, subject, body, thread_id=None):

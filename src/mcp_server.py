@@ -76,7 +76,9 @@ def build_tool_system_prompt() -> str:
 	tools_text = "\n\n".join(tools_description)
 	
 	system_prompt = f"""
-	You are a helpful AI assistant with access to the following tools: {tools_text}.
+	You are a helpful AI assistant with access to the following tools: {tools_text}. If the user requests information that can be obtained using one of these tools, you MUST respond ONLY with a JSON object specifying the tool to use and its parameters.
+
+	Refer : "my email, my task" as the user tasks. 
 
 	Rules:
 	1. If the user asks for something that requires a tool, respond ONLY with a valid JSON object:
@@ -95,12 +97,6 @@ def build_tool_system_prompt() -> str:
 
 	3. When using a tool, the response MUST be only the JSON object and nothing else.
 	"""
-	
-	print("="*80)
-	print("BUILT SYSTEM PROMPT:")
-	print("="*80)
-	print(system_prompt)
-	print("="*80)
 	
 	return system_prompt
 
@@ -138,11 +134,26 @@ async def execute_tool(tool_name: str, parameters: dict, base_url: str) -> dict:
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			if tool_name == "get_gmail":
 				resp = await client.get(f"{base_url}/tools/gmail")
-				return resp.json()
+				data = resp.json()
+				# Only return subject and sender for mails if present
+				filtered_emails = []
+				if "emails" in data:
+					for mail in data["emails"]:
+						subject = mail.get("subject") or mail.get("title")
+						sender = mail.get("sender") or mail.get("senderName") or mail.get("from")
+						filtered_emails.append({"subject": subject, "sender": sender})
+				return filtered_emails
 			
 			elif tool_name == "get_outlook":
 				resp = await client.get(f"{base_url}/tools/outlook")
-				return resp.json()
+				data = resp.json()
+				# Only return title for mails if present
+				filtered_mails = []
+				if "mails" in data:
+					for mail in data["mails"]:
+						title = mail.get("title") or mail.get("subject")
+						filtered_mails.append({"title": title})
+				return filtered_mails
 			
 			elif tool_name == "get_tasks":
 				# Outlook tasks are part of the outlook endpoint
@@ -222,6 +233,7 @@ async def gemini_chat(request: Request):
 	print("parsing tool call")
 	tool_call = parse_tool_call(response)
 	
+	print(tool_call)
 	if tool_call is None:
 		# No tool call detected, return the response as-is
 		print("no tool call")

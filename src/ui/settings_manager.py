@@ -730,8 +730,8 @@ class SettingsManager(QMainWindow):
             
             # Start uvicorn server in background
             self.tool_server_process = subprocess.Popen(
-                [sys.executable, "-m", "uvicorn", "src.mcp_server:api", "--host", "127.0.0.1", "--port", str(TOOL_SERVER_PORT)],
-                cwd=str(PROJECT_ROOT),
+                [sys.executable, "-m", "uvicorn", "mcp_server:api", "--host", "127.0.0.1", "--port", str(TOOL_SERVER_PORT)],
+                cwd=str(tools_dir),
                 stdout=None,  # Let output go to parent terminal
                 stderr=None,  # Let errors go to parent terminal
                 creationflags=0 if sys.platform == "win32" else 0  # Show console window
