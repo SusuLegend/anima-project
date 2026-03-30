@@ -1006,6 +1006,7 @@ class FloatingCharacter(QtWidgets.QWidget):
                     reply = f"Error: MCP server returned status {response.status_code}\n{response.text}"
             except Exception as e:
                 reply = f"Error contacting MCP server: {e}"
+            self._play_temp_gif("assets/slime-talking.gif", duration_ms=3750)
             self._show_llm_reply(reply)
 
     def _on_move_click(self):
