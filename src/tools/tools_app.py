@@ -372,10 +372,12 @@ def get_whatsapp():
 			with messages_file.open("r", encoding="utf-8") as f:
 				data = json.load(f)
 			if isinstance(data, list):
-				return {"messages": data, "count": len(data)}
+				recent = data[-20:]
+				return {"messages": recent, "count": len(recent)}
 			elif isinstance(data, dict) and "messages" in data:
 				msgs = data.get("messages", [])
-				return {"messages": msgs, "count": len(msgs)}
+				recent = msgs[-20:] if isinstance(msgs, list) else []
+				return {"messages": recent, "count": len(recent)}
 			else:
 				return {"messages": [], "count": 0, "status": "unexpected format"}
 		except Exception as read_err:

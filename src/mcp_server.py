@@ -9,9 +9,12 @@ import time
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 if str(PROJECT_ROOT) not in sys.path:
 	sys.path.insert(0, str(PROJECT_ROOT))
+
+CONFIG_PATH = PROJECT_ROOT / "config.json"
 	
 from src.database.rag_pipeline import RAGPipeline
 from src.ai_brain.groq_integration import GroqIntegration
+from src.ai_brain.local_ollama_integration import LocalOllamaIntegration
 from src.ai_brain.function_calling import llm_tools
 import os
 import json
@@ -48,7 +51,7 @@ rag_pipeline = RAGPipeline(
 	embedding_model=pinecone_embedding_model
 )
 
-CONTROL_START_TOOLS = {"start_session"}
+CONTROL_START_TOOLS = {"start_session", "session_start"}
 CONTROL_STOP_TOOLS = {"stop_session", "session_stop"}
 CONTROL_TOOLS = CONTROL_START_TOOLS | CONTROL_STOP_TOOLS
 MAX_SESSION_TURNS = 8
@@ -73,6 +76,72 @@ def _terminal_log(label: str, payload: Any = None) -> None:
 		print(json.dumps(payload, indent=2, ensure_ascii=False, default=str))
 	except Exception:
 		print(str(payload))
+
+
+def _load_runtime_llm_config() -> dict[str, Any]:
+	"""Load llm settings from config.json."""
+	default_cfg: dict[str, Any] = {"model": "groq", "timeout": 30.0}
+	try:
+		if CONFIG_PATH.exists():
+			with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+				cfg = json.load(f)
+			llm_cfg = cfg.get("llm", {})
+			if isinstance(llm_cfg, dict):
+				default_cfg.update(llm_cfg)
+	except Exception as e:
+		_terminal_log("Config load warning", {"error": str(e)})
+	return default_cfg
+
+
+def _create_llm_client(system_prompt: str):
+	"""Create llm client based on configured model value."""
+	llm_cfg = _load_runtime_llm_config()
+	model = str(llm_cfg.get("model", "groq") or "groq").strip()
+	model_lower = model.lower()
+
+	# Ollama models are typically formatted like "llama3.2:3b".
+	if ":" in model or model_lower.startswith(("llama", "mistral", "qwen", "phi", "gemma")):
+		_terminal_log("LLM backend selected", {"backend": "ollama", "model": model})
+		return LocalOllamaIntegration(model=model, system_prompt=system_prompt)
+
+	if model_lower.startswith("groq"):
+		_terminal_log("LLM backend selected", {"backend": "groq", "model": "llama-3.1-8b-instant"})
+		return GroqIntegration(system_prompt=system_prompt)
+
+	# Fallback to local Ollama for unknown backend strings.
+	_terminal_log("LLM backend selected", {"backend": "ollama", "model": model})
+	return LocalOllamaIntegration(model=model, system_prompt=system_prompt)
+
+
+def _load_memory() -> str:
+	"""Load persistent memory from /memory/memory.md."""
+	memory_path = PROJECT_ROOT / "memory" / "memory.md"
+	if not memory_path.exists():
+		return ""
+	try:
+		with open(memory_path, "r", encoding="utf-8") as f:
+			content = f.read().strip()
+		return content
+	except Exception as e:
+		_terminal_log("Memory load error", str(e))
+		return ""
+
+
+def _save_memory(content: str) -> str:
+	"""Append content to persistent memory file."""
+	memory_dir = PROJECT_ROOT / "memory"
+	memory_path = memory_dir / "memory.md"
+	try:
+		memory_dir.mkdir(parents=True, exist_ok=True)
+		timestamp = datetime.now().astimezone().isoformat()
+		with open(memory_path, "a", encoding="utf-8") as f:
+			f.write(f"\n[{timestamp}] {content}\n")
+		_terminal_log("Memory saved", {"content": content})
+		return f"Memory saved: {content}"
+	except Exception as e:
+		_terminal_log("Memory save error", str(e))
+		return f"Failed to save memory: {str(e)}"
+
 
 def build_tool_system_prompt() -> str:
 	"""Build a system prompt that includes available tools and instructs Gemini on JSON format."""
@@ -104,11 +173,13 @@ def build_tool_system_prompt() -> str:
 	You are a helpful AI assistant with access to the following tools: {tools_text}.
 
 	Your goal is to fulfill the user's request as accurately and efficiently as possible.
+	Everything that can change with time (such as containing "right now", or "who is the president of a country") should be verified with a tool call.
+	ONLY USE THE TOOLS MENTIONED ABOVE.
 
 	General behavior:
-	- Answer the user's actual request directly.
+	- Answer the user's actual request directly. Keep natural text response within 20-25 words IN ONE PARAGRAPH. Do not use line breaks.
 	- Be concise unless the user asks for depth.
-	- Do not invent facts, data, or tool results.
+	- Do not invent facts, data, or tool results. Any fact you can confirm with a tool should be confirmed by calling that tool.
 	- Do not assume information that should be retrieved from a tool.
 	- Make only minimal operational assumptions when necessary, and state them clearly.
 	- Do not apologize for lacking information before attempting an appropriate tool call.
@@ -138,11 +209,9 @@ def build_tool_system_prompt() -> str:
 	- When the mission is fulfilled, include stop_session to close the session.
 	- stop_session must be emitted in the same response as the final user-facing answer text outside the JSON block.
 	- The JSON block must contain a valid JSON array.
-	- Each item must have exactly these fields:
-	- "tool": string
-	- "parameters": object
 	- If a tool takes no parameters, use an empty object.
-	- Do not emit executable tools after stop_session.
+	- Do not emit executable tools after stop_session. Do not mention not using a tool after this
+	- Never output bare tool names in prose. If a tool is needed, it must appear in the JSON block.
 
 	Format examples:
 
@@ -192,6 +261,14 @@ def build_tool_system_prompt() -> str:
 
 	* Current time is {current_time}
 	"""
+	
+	# Load and inject persistent memory if available
+	loaded_memory = _load_memory()
+	if loaded_memory:
+		system_prompt += f"""
+	Persistent Memory (facts about the user to remember and reference):
+	{loaded_memory}
+	"""
 		
 	return system_prompt
 
@@ -215,10 +292,56 @@ def _normalize_commands(raw: Any) -> list[dict[str, Any]]:
 		tool_name = item.get("tool")
 		if not isinstance(tool_name, str) or not tool_name:
 			continue
+		if tool_name == "session_start":
+			tool_name = "start_session"
+		elif tool_name == "session_stop":
+			tool_name = "stop_session"
 		parameters = item.get("parameters", {})
 		if not isinstance(parameters, dict):
 			parameters = {}
 		commands.append({"tool": tool_name, "parameters": parameters})
+	return commands
+
+
+def _inject_control_tools_from_text(response: str, commands: list[dict[str, Any]]) -> list[dict[str, Any]]:
+	"""Detect session control tool mentions in raw text and inject canonical commands."""
+	text = (response or "").lower()
+	tools_found: list[str] = []
+	if re.search(r"\b(start_session|session_start)\b", text):
+		tools_found.append("start_session")
+	if re.search(r"\b(stop_session|session_stop)\b", text):
+		tools_found.append("stop_session")
+
+	if not tools_found:
+		return commands
+
+	existing_tools = {cmd.get("tool") for cmd in commands}
+	for tool_name in tools_found:
+		if tool_name not in existing_tools:
+			commands.append({"tool": tool_name, "parameters": {}})
+			existing_tools.add(tool_name)
+
+	return commands
+
+
+def _inject_executable_tools_from_text(response: str, commands: list[dict[str, Any]]) -> list[dict[str, Any]]:
+	"""Best-effort recovery when model mentions a known tool in prose without JSON."""
+	if commands:
+		return commands
+
+	text = (response or "")
+	text_lower = text.lower()
+	intent_markers = ("use", "call", "check", "checking", "fetch", "retrieve", "look up", "search")
+	if not any(marker in text_lower for marker in intent_markers):
+		return commands
+
+	for tool in llm_tools.get_schema():
+		name = tool.get("name") if isinstance(tool, dict) else None
+		if not isinstance(name, str) or not name or name in CONTROL_TOOLS:
+			continue
+		if re.search(rf"\b{re.escape(name)}\b", text):
+			commands.append({"tool": name, "parameters": {}})
+
 	return commands
 
 
@@ -257,6 +380,8 @@ def parse_llm_response(response: str) -> tuple[str, list[dict[str, Any]], bool]:
 				parse_error = True
 
 	visible_text = _trim_visible_text("".join(visible_parts))
+	commands = _inject_control_tools_from_text(response, commands)
+	commands = _inject_executable_tools_from_text(response, commands)
 	return visible_text, commands, parse_error
 
 
@@ -274,7 +399,13 @@ def _sanitize_history_value(value: Any) -> Any:
 	if isinstance(value, list):
 		return [_sanitize_history_value(item) for item in value]
 	if isinstance(value, dict):
-		return {key: _sanitize_history_value(val) for key, val in value.items()}
+		# Exclude 'raw' field from assistant responses to avoid backtick spam in prompt serialization
+		sanitized = {}
+		for key, val in value.items():
+			if key == "raw":
+				continue
+			sanitized[key] = _sanitize_history_value(val)
+		return sanitized
 	return value
 
 
@@ -336,7 +467,25 @@ async def execute_tool(tool_name: str, parameters: dict, base_url: str) -> Any:
 	_terminal_log("Tool execution start", {"tool": tool_name, "parameters": parameters})
 	try:
 		async with httpx.AsyncClient(timeout=30.0) as client:
-			if tool_name == "get_gmail":
+			if tool_name == "save_memory":
+				content = parameters.get("content", "").strip()
+				if not content:
+					return {"error": "Content parameter is required for save_memory"}
+				return {"success": True, "message": _save_memory(content)}
+			
+			elif tool_name == "get_gmail":
+				resp = await client.get(f"{base_url}/tools/gmail")
+				data = resp.json()
+				# Only return subject and sender for mails if present
+				filtered_emails = []
+				if "emails" in data:
+					for mail in data["emails"]:
+						subject = mail.get("subject") or mail.get("title")
+						sender = mail.get("sender") or mail.get("senderName") or mail.get("from")
+						filtered_emails.append({"subject": subject, "sender": sender})
+				return filtered_emails
+			
+			elif tool_name == "get_outlook":
 				resp = await client.get(f"{base_url}/tools/gmail")
 				data = resp.json()
 				# Only return subject and sender for mails if present
@@ -427,7 +576,7 @@ async def gemini_chat(request: Request):
 
 	tool_system_prompt = build_tool_system_prompt()
 	combined_system_prompt = f"{user_system_prompt}\n\n{tool_system_prompt}" if user_system_prompt else tool_system_prompt
-	gemini_ai = GroqIntegration(system_prompt=combined_system_prompt)
+	gemini_ai = _create_llm_client(system_prompt=combined_system_prompt)
 
 	base_url = str(request.base_url).rstrip("/")
 	conversation_history: list[dict[str, Any]] = []
@@ -544,7 +693,6 @@ async def gemini_chat(request: Request):
 			conversation_history.clear()
 			final_payload = {
 				"reply": final_reply or "Session completed. I finished the tool workflow but could not generate a final message.",
-				"progress_messages": progress_messages,
 				"tool_trace": tool_trace,
 				"session_closed": True,
 				"session_incomplete": False
@@ -596,7 +744,6 @@ async def gemini_chat(request: Request):
 		conversation_history.clear()
 		final_payload = {
 			"reply": final_reply or "I could not safely finish the session. Please try again.",
-			"progress_messages": progress_messages,
 			"tool_trace": tool_trace,
 			"session_closed": stop_called,
 			"session_incomplete": session_incomplete
@@ -618,7 +765,6 @@ async def gemini_chat(request: Request):
 	conversation_history.clear()
 	final_payload = {
 		"reply": final_reply or last_visible_text or "(No reply)",
-		"progress_messages": progress_messages,
 		"tool_trace": tool_trace,
 		"session_closed": True,
 		"session_incomplete": False

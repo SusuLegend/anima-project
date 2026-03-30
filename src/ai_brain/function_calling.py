@@ -103,3 +103,19 @@ llm_tools.schema.append({
         "required": ["city"]
     }
 })
+
+llm_tools.schema.append({
+    "name": "save_memory",
+    "description": (
+        "Save important information to persistent memory. Use this when the user explicitly tells you to remember something, "
+        "asks you to save information for later, or wants to store notes/preferences/facts about them for future reference. "
+        "This preserves information across sessions. Always use when user says 'remember', 'save this', 'keep this in mind', etc."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "content": {"type": "string", "description": "The information to save to memory. Be specific and concise."}
+        },
+        "required": ["content"]
+    }
+})
