@@ -173,7 +173,7 @@ def build_tool_system_prompt() -> str:
 	You are a helpful AI assistant with access to the following tools: {tools_text}.
 
 	Your goal is to fulfill the user's request as accurately and efficiently as possible.
-	Everything that can change with time should be verified with a tool call.
+	Everything that will change with time, or is time-dependent, should be verified with a tool call.
 	ONLY USE THE TOOLS MENTIONED ABOVE.
 
 	General behavior:
@@ -209,8 +209,8 @@ def build_tool_system_prompt() -> str:
 	- stop_session must be emitted in the same response as the final user-facing answer text outside the JSON block.
 	- The JSON block must contain a valid JSON array.
 	- If a tool takes no parameters, use an empty object.
-	- Do not emit executable tools after stop_session. Do not mention not using a tool after this
-	- Never output bare tool names in prose. If a tool is needed, it must appear in the JSON block.
+	- Always give only natural text answer after stop_session, without any JSON tool call.
+	- If a tool is needed, it must appear in the JSON block. Always put it in a JSON block
 
 	Format examples:
 
@@ -242,14 +242,12 @@ def build_tool_system_prompt() -> str:
 
 	Natural-language output rules:
 
-	* If no tool is needed, answer normally in natural language.
-	* Do not include JSON if no tool is needed.
+	* If no tool is needed, answer normally in natural language without JSON.
 
 	Tool selection rules:
 
 	* If the answer cannot be established reliably from built-in knowledge and an available tool can verify it, prefer the tool.
 	* If multiple tools are needed, choose the smallest valid sequence.
-	* Do not call tools redundantly.
 
 	Failure handling:
 
