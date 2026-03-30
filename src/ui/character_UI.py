@@ -933,7 +933,25 @@ class FloatingCharacter(QtWidgets.QWidget):
                 }
                 response = requests.post(mcp_url, json=payload, timeout=30)
                 if response.status_code == 200:
-                    reply = response.json().get("reply", "(No reply)")
+                    body = response.json()
+                    progress_messages = body.get("progress_messages", [])
+                    final_reply = body.get("reply", "(No reply)")
+                    session_incomplete = body.get("session_incomplete", False)
+
+                    deduped_messages = []
+                    for msg in progress_messages:
+                        cleaned = (msg or "").strip()
+                        if not cleaned:
+                            continue
+                        if not deduped_messages or deduped_messages[-1] != cleaned:
+                            deduped_messages.append(cleaned)
+
+                    cleaned_final = (final_reply or "").strip() or "(No reply)"
+                    progress_only = [msg for msg in deduped_messages if msg != cleaned_final]
+                    reply = "\n\n".join(progress_only + [cleaned_final])
+
+                    if session_incomplete:
+                        reply = f"{reply}\n\n[Warning] Session ended without explicit stop_session signal."
                 else:
                     reply = f"Error: MCP server returned status {response.status_code}\n{response.text}"
             except Exception as e:

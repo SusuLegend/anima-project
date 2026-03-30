@@ -3,7 +3,7 @@ from typing import Callable, Dict, Any
 class LLMToolRegistry:
     def __init__(self):
         self.tools: Dict[str, Callable] = {}
-        self.schema: Dict[str, Any] = []
+        self.schema: list[Dict[str, Any]] = []
 
     def register(self, name: str, description: str, parameters: dict):
         """Decorator to register a function as an LLM callable tool."""
@@ -17,7 +17,7 @@ class LLMToolRegistry:
             return func
         return wrapper
 
-    def get_schema(self):
+    def get_schema(self) -> list[Dict[str, Any]]:
         return self.schema
 
     def call(self, name: str, args: dict):
@@ -26,6 +26,24 @@ class LLMToolRegistry:
         return self.tools[name](**args)
 
 llm_tools = LLMToolRegistry()
+
+llm_tools.schema.append({
+    "name": "start_session",
+    "description": "Start a tool-calling session. Use before running one or more tools for multi-step retrieval.",
+    "parameters": {}
+})
+
+llm_tools.schema.append({
+    "name": "stop_session",
+    "description": "End the active tool-calling session after finalizing the user-facing answer.",
+    "parameters": {}
+})
+
+llm_tools.schema.append({
+    "name": "session_stop",
+    "description": "Alias of stop_session. End the active tool-calling session after finalizing the user-facing answer.",
+    "parameters": {}
+})
 
 llm_tools.schema.append({
     "name": "get_gmail",

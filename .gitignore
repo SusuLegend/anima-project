@@ -25,3 +25,4 @@ src/tools/whatsapp_listener/auth/
 
 **/*.log
 **/messages.json
+/memory/*

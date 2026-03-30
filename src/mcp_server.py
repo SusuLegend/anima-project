@@ -1,18 +1,18 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import sys
+from typing import Any
+import re
+import time
 
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 if str(PROJECT_ROOT) not in sys.path:
 	sys.path.insert(0, str(PROJECT_ROOT))
 	
 from src.database.rag_pipeline import RAGPipeline
-from src.ai_brain.gemini_integration import GeminiIntegration
 from src.ai_brain.groq_integration import GroqIntegration
 from src.ai_brain.function_calling import llm_tools
-from fastapi import Request
 import os
 import json
 import httpx
@@ -21,9 +21,6 @@ from datetime import datetime
 
 api = FastAPI()
 
-# Import tools_app FastAPI app
-import sys
-import os
 from src.tools.tools_app import app as tools_app
 
 # Mount tools_app under /tools
@@ -42,7 +39,7 @@ api.add_middleware(
 #####################
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
-pinecone_api_key = os.getenv('PINECONE_API_KEY')
+pinecone_api_key = os.getenv('PINECONE_API_KEY', '')
 pinecone_index_name = os.getenv('PINECONE_INDEX_NAME', 'rag-documents')
 pinecone_embedding_model = os.getenv('PINECONE_EMBEDDING_MODEL', 'all-MiniLM-L6-v2')
 rag_pipeline = RAGPipeline(
@@ -50,6 +47,32 @@ rag_pipeline = RAGPipeline(
 	index_name=pinecone_index_name,
 	embedding_model=pinecone_embedding_model
 )
+
+CONTROL_START_TOOLS = {"start_session"}
+CONTROL_STOP_TOOLS = {"stop_session", "session_stop"}
+CONTROL_TOOLS = CONTROL_START_TOOLS | CONTROL_STOP_TOOLS
+MAX_SESSION_TURNS = 8
+ORCHESTRATION_TIMEOUT_SECONDS = 45.0
+
+FORCED_CLOSE_HEADER = (
+	"[SESSION_GUARD_NOTICE] You reached the tool-session guard limit. "
+	"You must respond immediately in this turn and include stop_session in your JSON tool block."
+)
+
+
+def _terminal_log(label: str, payload: Any = None) -> None:
+	"""Write structured runtime logs to terminal."""
+	stamp = datetime.now().astimezone().isoformat()
+	print(f"[MCP][{stamp}] {label}")
+	if payload is None:
+		return
+	if isinstance(payload, str):
+		print(payload)
+		return
+	try:
+		print(json.dumps(payload, indent=2, ensure_ascii=False, default=str))
+	except Exception:
+		print(str(payload))
 
 def build_tool_system_prompt() -> str:
 	"""Build a system prompt that includes available tools and instructs Gemini on JSON format."""
@@ -109,11 +132,17 @@ def build_tool_system_prompt() -> str:
 	- If one or more tool calls are needed, respond with:
 	1. a brief explanation of why the tool is needed
 	2. exactly one fenced JSON code block at the end
+	- Session protocol is mandatory for tool workflows.
+	- If any executable tool is required, include start_session before or with the first executable tool call.
+	- While session is active, you may include user-visible progress text outside JSON.
+	- When the mission is fulfilled, include stop_session to close the session.
+	- stop_session must be emitted in the same response as the final user-facing answer text outside the JSON block.
 	- The JSON block must contain a valid JSON array.
 	- Each item must have exactly these fields:
 	- "tool": string
 	- "parameters": object
 	- If a tool takes no parameters, use an empty object.
+	- Do not emit executable tools after stop_session.
 
 	Format examples:
 
@@ -167,35 +196,144 @@ def build_tool_system_prompt() -> str:
 	return system_prompt
 
 
-def parse_tool_call(response: str) -> dict | None:
-	"""Try to parse the response as a tool call JSON. Returns dict if valid, None otherwise."""
-	response = response.strip()
-	
-	# Try to extract JSON if it's wrapped in markdown code blocks
-	if response.startswith("```"):
-		lines = response.split("\n")
-		json_lines = []
-		in_code_block = False
-		for line in lines:
-			if line.startswith("```"):
-				in_code_block = not in_code_block
-				continue
-			if in_code_block:
-				json_lines.append(line)
-		response = "\n".join(json_lines).strip()
-	
-	try:
-		data = json.loads(response)
-		if isinstance(data, dict) and "tool" in data:
-			return data
-	except json.JSONDecodeError:
-		pass
-	
-	return None
+def _trim_visible_text(text: str) -> str:
+	"""Strip trailing spaces from each line and trim overall text."""
+	return "\n".join(line.rstrip() for line in text.splitlines()).strip()
 
 
-async def execute_tool(tool_name: str, parameters: dict, base_url: str) -> dict:
+def _normalize_commands(raw: Any) -> list[dict[str, Any]]:
+	"""Normalize parsed JSON into a list of command objects."""
+	if isinstance(raw, dict):
+		raw = [raw]
+	if not isinstance(raw, list):
+		return []
+
+	commands: list[dict[str, Any]] = []
+	for item in raw:
+		if not isinstance(item, dict):
+			continue
+		tool_name = item.get("tool")
+		if not isinstance(tool_name, str) or not tool_name:
+			continue
+		parameters = item.get("parameters", {})
+		if not isinstance(parameters, dict):
+			parameters = {}
+		commands.append({"tool": tool_name, "parameters": parameters})
+	return commands
+
+
+def parse_llm_response(response: str) -> tuple[str, list[dict[str, Any]], bool]:
+	"""Parse visible text and JSON command block from model output."""
+	response = response or ""
+	code_blocks = list(re.finditer(r"```(?:json)?\s*(.*?)```", response, flags=re.IGNORECASE | re.DOTALL))
+
+	visible_parts: list[str] = []
+	commands: list[dict[str, Any]] = []
+	parse_error = False
+	last_end = 0
+
+	for match in code_blocks:
+		visible_parts.append(response[last_end:match.start()])
+		block_content = match.group(1).strip()
+		if commands:
+			last_end = match.end()
+			continue
+		try:
+			parsed = json.loads(block_content)
+			commands = _normalize_commands(parsed)
+		except json.JSONDecodeError:
+			parse_error = True
+		last_end = match.end()
+
+	if code_blocks:
+		visible_parts.append(response[last_end:])
+	else:
+		visible_parts.append(response)
+		stripped = response.strip()
+		if stripped.startswith("[") or stripped.startswith("{"):
+			try:
+				commands = _normalize_commands(json.loads(stripped))
+			except json.JSONDecodeError:
+				parse_error = True
+
+	visible_text = _trim_visible_text("".join(visible_parts))
+	return visible_text, commands, parse_error
+
+
+def _collapse_linebreaks(text: str) -> str:
+	"""Replace one or more line breaks with a single space for compact history context."""
+	text = re.sub(r"\s*\n+\s*", " ", text)
+	text = re.sub(r" {2,}", " ", text)
+	return text.strip()
+
+
+def _sanitize_history_value(value: Any) -> Any:
+	"""Recursively sanitize history payload values before reusing them in prompts."""
+	if isinstance(value, str):
+		return _collapse_linebreaks(value)
+	if isinstance(value, list):
+		return [_sanitize_history_value(item) for item in value]
+	if isinstance(value, dict):
+		return {key: _sanitize_history_value(val) for key, val in value.items()}
+	return value
+
+
+def _to_jsonl(records: list[dict[str, Any]]) -> str:
+	"""Serialize records as compact JSONL for prompt-efficient context passing."""
+	if not records:
+		return ""
+	return "\n".join(
+		json.dumps(_sanitize_history_value(item), ensure_ascii=False, separators=(",", ":"), default=str)
+		for item in records
+	)
+
+
+def build_session_follow_up_prompt(user_prompt: str, conversation_history: list[dict[str, Any]], force_close: bool = False) -> str:
+	"""Build next-turn prompt using accumulated session history."""
+	context_payload = _to_jsonl(conversation_history)
+	header = FORCED_CLOSE_HEADER if force_close else "[SESSION_CONTINUE] Continue from this session context."
+	return f"""{header}
+
+Original user request:
+{user_prompt}
+
+Session conversation history:
+{context_payload}
+
+Instructions:
+- Use the history exactly as provided.
+- If tools are still needed, return one JSON block with tool commands.
+- If you are done, provide final user-facing answer and include stop_session in the JSON block.
+"""
+
+
+def build_final_answer_prompt(user_prompt: str, conversation_history: list[dict[str, Any]], tool_trace: list[dict[str, Any]]) -> str:
+	"""Force a final natural-language answer from the current session context."""
+	context_payload = _to_jsonl(conversation_history)
+	trace_payload = _to_jsonl(tool_trace)
+	return f"""[FINAL_RESPONSE_REQUIRED]
+The tool execution phase is complete. Respond to the user immediately.
+
+Original user request:
+{user_prompt}
+
+Session conversation history:
+{context_payload}
+
+Tool trace:
+{trace_payload}
+
+Rules:
+- Output only natural language.
+- Do not output JSON.
+- Do not call any tools.
+- Give the final answer to the user now.
+"""
+
+
+async def execute_tool(tool_name: str, parameters: dict, base_url: str) -> Any:
 	"""Execute the specified tool with given parameters."""
+	_terminal_log("Tool execution start", {"tool": tool_name, "parameters": parameters})
 	try:
 		async with httpx.AsyncClient(timeout=30.0) as client:
 			if tool_name == "get_gmail":
@@ -266,68 +404,227 @@ async def execute_tool(tool_name: str, parameters: dict, base_url: str) -> dict:
 				return resp.json()
 			
 			else:
-				return {"error": f"Unknown tool: {tool_name}"}
+				result = {"error": f"Unknown tool: {tool_name}"}
+				_terminal_log("Tool execution result", {"tool": tool_name, "result": result})
+				return result
 	
 	except Exception as e:
-		return {"error": f"Tool execution failed: {str(e)}"}
+		error_result = {"error": f"Tool execution failed: {str(e)}"}
+		_terminal_log("Tool execution error", {"tool": tool_name, "result": error_result})
+		return error_result
 
 
 @api.post("/gemini_chat")
 async def gemini_chat(request: Request):
-	"""Get a response from Gemini AI with JSON-based tool calling."""
+	"""Handle chat responses with session-based tool orchestration."""
 	data = await request.json()
-	user_prompt = data.get("prompt", "")
-	user_system_prompt = data.get("system_prompt", None)
-	
-	# Build tool-aware system prompt
+	user_prompt = (data.get("prompt") or "").strip()
+	user_system_prompt = data.get("system_prompt")
+	_terminal_log("Incoming /gemini_chat request", {"prompt": user_prompt, "has_system_prompt": bool(user_system_prompt)})
+
+	if not user_prompt:
+		return {"reply": "Please provide a prompt."}
+
 	tool_system_prompt = build_tool_system_prompt()
-	print("built system prompt")
-	print(tool_system_prompt)
-	
-	# Combine user's system prompt with tool instructions
-	if user_system_prompt:
-		combined_system_prompt = f"{user_system_prompt}\n\n{tool_system_prompt}"
-	else:
-		combined_system_prompt = tool_system_prompt
-	print("made system prompt")
-	# Initialize Gemini with tool-aware system prompt
+	combined_system_prompt = f"{user_system_prompt}\n\n{tool_system_prompt}" if user_system_prompt else tool_system_prompt
 	gemini_ai = GroqIntegration(system_prompt=combined_system_prompt)
-	
-	# Get Gemini's response
-	response = gemini_ai.get_response(user_prompt)
-	
-	# Try to parse as tool call
-	print("parsing tool call")
-	tool_call = parse_tool_call(response)
-	
-	print(tool_call)
-	if tool_call is None:
-		# No tool call detected, return the response as-is
-		print("no tool call")
-		return {"reply": response}
-	
-	# Execute the tool
-	tool_name = tool_call.get("tool", "")
-	parameters = tool_call.get("parameters", {})
-	
+
 	base_url = str(request.base_url).rstrip("/")
-	tool_result = await execute_tool(tool_name, parameters, base_url)
-	print(f"executed tool {tool_name} with result {tool_result}")
+	conversation_history: list[dict[str, Any]] = []
+	progress_messages: list[str] = []
+	tool_trace: list[dict[str, Any]] = []
+	session_active = False
+	session_incomplete = False
+	final_reply = ""
+	last_visible_text = ""
+	last_tool_signature = ""
 
-	# Send tool result back to Gemini for final response
-	follow_up_prompt = f"""The tool '{tool_name}' returned the following result:
+	started_at = time.monotonic()
+	pending_prompt = user_prompt
 
-{json.dumps(tool_result, indent=2)}
+	for turn in range(1, MAX_SESSION_TURNS + 1):
+		if time.monotonic() - started_at > ORCHESTRATION_TIMEOUT_SECONDS:
+			_terminal_log("Session guard triggered: timeout", {"turn": turn})
+			break
 
-Based on this result and the user's original request: "{user_prompt}", please provide a helpful response to the user."""
-	
-	final_reply = gemini_ai.get_response(follow_up_prompt)
-	
-	return {
-		"reply": final_reply,
-		"tool_used": tool_name,
-		"tool_result": tool_result
+		if turn == 1:
+			conversation_history.append({"type": "user_prompt", "turn": turn, "content": user_prompt})
+		else:
+			conversation_history.append({
+				"type": "orchestration_turn",
+				"turn": turn,
+				"content": "[SESSION_CONTINUE_PROMPT_SENT]"
+			})
+		_terminal_log("LLM request", {"turn": turn, "prompt": pending_prompt})
+		response = gemini_ai.get_response(pending_prompt)
+		_terminal_log("LLM raw response", {"turn": turn, "response": response})
+		visible_text, commands, parse_error = parse_llm_response(response)
+		_terminal_log("LLM parsed response", {"turn": turn, "visible_text": visible_text, "commands": commands, "parse_error": parse_error})
+
+		conversation_history.append({
+			"type": "assistant_response",
+			"turn": turn,
+			"raw": response,
+			"visible_text": visible_text,
+			"commands": commands
+		})
+
+		if visible_text:
+			progress_messages.append(visible_text)
+			last_visible_text = visible_text
+
+		if parse_error and not commands:
+			_terminal_log("Parse error without commands; ending turn loop", {"turn": turn})
+			break
+
+		if not commands:
+			if not session_active:
+				_terminal_log("No commands and no active session; ending loop", {"turn": turn})
+				break
+			pending_prompt = build_session_follow_up_prompt(user_prompt, conversation_history)
+			continue
+
+		conversation_history.append({"type": "tool_call", "turn": turn, "commands": commands})
+
+		start_called = any(cmd.get("tool") in CONTROL_START_TOOLS for cmd in commands)
+		stop_called = any(cmd.get("tool") in CONTROL_STOP_TOOLS for cmd in commands)
+
+		executable_commands = [cmd for cmd in commands if cmd.get("tool") not in CONTROL_TOOLS]
+
+		if start_called or executable_commands:
+			# Auto-start if model forgot start_session but attempted executable tools.
+			session_active = True
+			if executable_commands and not start_called:
+				conversation_history.append({
+					"type": "session_auto_start",
+					"turn": turn,
+					"reason": "Executable tool call detected without explicit start_session"
+				})
+
+		if executable_commands:
+			tool_signature = json.dumps(executable_commands, sort_keys=True)
+			if tool_signature == last_tool_signature:
+				_terminal_log("Repeated tool signature guard hit; ending loop", {"turn": turn, "signature": tool_signature})
+				break
+			last_tool_signature = tool_signature
+
+		for cmd in executable_commands:
+			tool_name = cmd.get("tool", "")
+			parameters = cmd.get("parameters", {})
+			tool_result = await execute_tool(tool_name, parameters, base_url)
+			_terminal_log("Tool output", {"turn": turn, "tool": tool_name, "parameters": parameters, "result": tool_result})
+			tool_trace.append({"tool": tool_name, "parameters": parameters, "result": tool_result})
+			conversation_history.append({
+				"type": "tool_result",
+				"turn": turn,
+				"tool": tool_name,
+				"parameters": parameters,
+				"result": tool_result
+			})
+
+		if stop_called:
+			if visible_text:
+				# stop_session indicates completion; prefer the assistant's visible final text.
+				final_reply = visible_text
+			elif tool_trace:
+				finalize_prompt = build_final_answer_prompt(user_prompt, conversation_history, tool_trace)
+				conversation_history.append({"type": "finalize_prompt", "turn": turn, "content": finalize_prompt})
+				_terminal_log("Finalize prompt", {"turn": turn, "prompt": finalize_prompt})
+				finalize_response = gemini_ai.get_response(finalize_prompt)
+				_terminal_log("Finalize raw response", {"turn": turn, "response": finalize_response})
+				final_text, _, _ = parse_llm_response(finalize_response)
+				_terminal_log("Finalize parsed response", {"turn": turn, "final_text": final_text})
+				if final_text:
+					progress_messages.append(final_text)
+					final_reply = final_text
+			elif not final_reply:
+				final_reply = "Session completed."
+
+			session_active = False
+			conversation_history.clear()
+			final_payload = {
+				"reply": final_reply or "Session completed. I finished the tool workflow but could not generate a final message.",
+				"progress_messages": progress_messages,
+				"tool_trace": tool_trace,
+				"session_closed": True,
+				"session_incomplete": False
+			}
+			_terminal_log("/gemini_chat response payload", final_payload)
+			return final_payload
+
+		if session_active:
+			pending_prompt = build_session_follow_up_prompt(user_prompt, conversation_history)
+		else:
+			break
+
+	if session_active:
+		force_prompt = build_session_follow_up_prompt(user_prompt, conversation_history, force_close=True)
+		conversation_history.append({"type": "forced_close_prompt", "content": force_prompt})
+		_terminal_log("Forced-close prompt", {"prompt": force_prompt})
+		force_response = gemini_ai.get_response(force_prompt)
+		_terminal_log("Forced-close raw response", {"response": force_response})
+		visible_text, force_commands, _ = parse_llm_response(force_response)
+		_terminal_log("Forced-close parsed response", {"visible_text": visible_text, "commands": force_commands})
+
+		conversation_history.append({
+			"type": "forced_close_response",
+			"raw": force_response,
+			"visible_text": visible_text,
+			"commands": force_commands
+		})
+
+		if visible_text:
+			progress_messages.append(visible_text)
+			last_visible_text = visible_text
+
+		stop_called = any(cmd.get("tool") in CONTROL_STOP_TOOLS for cmd in force_commands)
+		if stop_called and visible_text and not tool_trace:
+			final_reply = visible_text
+
+		if not final_reply and tool_trace:
+			fallback_prompt = build_final_answer_prompt(user_prompt, conversation_history, tool_trace)
+			_terminal_log("Fallback final prompt", {"prompt": fallback_prompt})
+			fallback_response = gemini_ai.get_response(fallback_prompt)
+			_terminal_log("Fallback final raw response", {"response": fallback_response})
+			fallback_text, _, _ = parse_llm_response(fallback_response)
+			_terminal_log("Fallback final parsed response", {"final_text": fallback_text})
+			if fallback_text:
+				progress_messages.append(fallback_text)
+				final_reply = fallback_text
+
+		session_incomplete = not stop_called
+		conversation_history.clear()
+		final_payload = {
+			"reply": final_reply or "I could not safely finish the session. Please try again.",
+			"progress_messages": progress_messages,
+			"tool_trace": tool_trace,
+			"session_closed": stop_called,
+			"session_incomplete": session_incomplete
+		}
+		_terminal_log("/gemini_chat response payload", final_payload)
+		return final_payload
+
+	if not final_reply and tool_trace:
+		finalize_prompt = build_final_answer_prompt(user_prompt, conversation_history, tool_trace)
+		_terminal_log("Post-loop finalize prompt", {"prompt": finalize_prompt})
+		finalize_response = gemini_ai.get_response(finalize_prompt)
+		_terminal_log("Post-loop finalize raw response", {"response": finalize_response})
+		final_text, _, _ = parse_llm_response(finalize_response)
+		_terminal_log("Post-loop finalize parsed response", {"final_text": final_text})
+		if final_text:
+			progress_messages.append(final_text)
+			final_reply = final_text
+
+	conversation_history.clear()
+	final_payload = {
+		"reply": final_reply or last_visible_text or "(No reply)",
+		"progress_messages": progress_messages,
+		"tool_trace": tool_trace,
+		"session_closed": True,
+		"session_incomplete": False
 	}
+	_terminal_log("/gemini_chat response payload", final_payload)
+	return final_payload
 
 # RAG search endpoint
 @api.post("/rag_search")
@@ -339,8 +636,6 @@ def rag_search(query: str, top_k: int = 3):
 @api.get("/")
 def root():
 	return {"message": "Unified MCP API is running."}
-
-
 
 if __name__ == "__main__":
 	import uvicorn
