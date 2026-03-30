@@ -80,7 +80,7 @@ CONFIG = load_config()
 # ---------------------- Configuration ----------------------
 CHARACTER_GIF = str(Path(__file__).parent.parent.parent / CONFIG["ui"]["character_gif"])  # Use the path from config.json
 print("Character GIF path:", CHARACTER_GIF)
-WANDER_INTERVAL_MS = 2000
+WANDER_INTERVAL_MS = 5000
 WINDOW_OPACITY = 0.95
 MOVE_STEP = 20 # pixels per wander step
 SIZE_MODE = CONFIG["ui"].get("size_mode", "Fixed Size")
@@ -921,7 +921,7 @@ class FloatingCharacter(QtWidgets.QWidget):
         # Get the center position of the character window in global coordinates
         global_center = self.mapToGlobal(self.rect().center())
         center_x, center_y = global_center.x(), global_center.y()
-        radius = 100  # Closer distance to keep buttons over the GIF
+        radius = 110  # Closer distance to keep buttons over the GIF
         
         # Define buttons at 10, 11, and 12 o'clock: (angle_degrees, label, icon_text, callback)
         # Angles: 240° (10 o'clock), 270° (12 o'clock), 300° (11 o'clock)
@@ -1124,7 +1124,7 @@ class FloatingCharacter(QtWidgets.QWidget):
         ny = max(geom.top(), min(ny, geom.bottom() - self.height()))
 
         self.move(nx, ny)
-        self._play_temp_gif("assets/slime-jump.gif", duration_ms=1000)
+        self._play_temp_gif("assets/slime-jump.gif", duration_ms=1250)
 
 def main():
     app = QtWidgets.QApplication([])
