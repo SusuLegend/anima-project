@@ -80,9 +80,9 @@ CONFIG = load_config()
 # ---------------------- Configuration ----------------------
 CHARACTER_GIF = str(Path(__file__).parent.parent.parent / CONFIG["ui"]["character_gif"])  # Use the path from config.json
 print("Character GIF path:", CHARACTER_GIF)
-WANDER_INTERVAL_MS = 700
+WANDER_INTERVAL_MS = 5000
 WINDOW_OPACITY = 0.95
-MOVE_STEP = 12 # pixels per wander step
+MOVE_STEP = 20 # pixels per wander step
 SIZE_MODE = CONFIG["ui"].get("size_mode", "Fixed Size")
 CONFIG_WINDOW_W, CONFIG_WINDOW_H = CONFIG["ui"].get("window_size", [200, 200])
 # -----------------------------------------------------------
@@ -229,23 +229,12 @@ class SpeechBubble(QtWidgets.QWidget):
         
         # Calculate dimensions dynamically based on message length
         message_length = len(message)
-        
-        # Adjust max dimensions based on message length
-        if message_length < 30:
-            max_bubble_width = 250
-            max_bubble_height = 120
-        elif message_length > 100:
-            max_bubble_width = 400
-            max_bubble_height = 160
-        elif message_length > 200:
-            max_bubble_width = 500
-            max_bubble_height = 220
-        else:
-            max_bubble_width = 600
-            max_bubble_height = 290
-        
-        min_bubble_width = 160
-        
+        min_bubble_width = 200   
+        RATIO = 2.07
+        BASE_WIDTH = 250
+        max_bubble_width = int(BASE_WIDTH + (message_length * 1.75))  # Base width + 7 pixels per character
+        max_bubble_height = int(max_bubble_width / RATIO)
+
         # Padding values
         horizontal_padding = 30
         vertical_padding = 20
@@ -679,6 +668,66 @@ class FloatingCharacter(QtWidgets.QWidget):
         self.tray.activated.connect(self._on_tray_activated)
         self.tray.show()
 
+    def _play_temp_gif(self, temp_gif_path: str, duration_ms: int = 2000):
+        """
+        Swap to a temporary GIF for a fixed duration, then return to the idle GIF.
+
+        Args:
+            temp_gif_path: Path to the GIF to play while the event is active.
+            duration_ms:   How long (ms) to show the temp GIF before switching. Default 2000ms.
+        """
+        RETURN_GIF = "assets/slime-idle.gif"
+
+        if getattr(self, '_temp_gif_playing', False):
+            return
+
+        if not Path(temp_gif_path).exists():
+            print(f"Temp GIF not found: {temp_gif_path}")
+            return
+
+        self._temp_gif_playing = True
+        self.wander_timer.stop()
+
+        temp_movie = QtGui.QMovie(temp_gif_path)
+        if not temp_movie.isValid():
+            print(f"Invalid temp GIF: {temp_gif_path}")
+            self._temp_gif_playing = False
+            self.wander_timer.start()
+            return
+
+        temp_movie.setCacheMode(QtGui.QMovie.CacheAll)
+        temp_movie.setSpeed(100)
+        temp_movie.setScaledSize(self.char_label.size())
+        self.char_label.setMovie(temp_movie)
+        self.movie = temp_movie
+        temp_movie.start()
+
+        def _switch_to_idle():
+            if not Path(RETURN_GIF).exists():
+                print(f"Idle GIF not found: {RETURN_GIF}")
+                self._temp_gif_playing = False
+                self.wander_timer.start()
+                return
+
+            idle_movie = QtGui.QMovie(RETURN_GIF)
+            if not idle_movie.isValid():
+                print(f"Invalid idle GIF: {RETURN_GIF}")
+                self._temp_gif_playing = False
+                self.wander_timer.start()
+                return
+
+            idle_movie.setCacheMode(QtGui.QMovie.CacheAll)
+            idle_movie.setSpeed(100)
+            idle_movie.setScaledSize(self.char_label.size())
+            idle_movie.finished.connect(self._restart_movie)
+            self.char_label.setMovie(idle_movie)
+            self.movie = idle_movie
+            idle_movie.start()
+
+            self._temp_gif_playing = False
+            self.wander_timer.start()
+
+        QtCore.QTimer.singleShot(duration_ms, _switch_to_idle)
     def _toggle_visibility(self):
         self.setVisible(not self.isVisible())
 
@@ -861,7 +910,7 @@ class FloatingCharacter(QtWidgets.QWidget):
         # Get the center position of the character window in global coordinates
         global_center = self.mapToGlobal(self.rect().center())
         center_x, center_y = global_center.x(), global_center.y()
-        radius = 100  # Closer distance to keep buttons over the GIF
+        radius = 110  # Closer distance to keep buttons over the GIF
         
         # Define buttons at 10, 11, and 12 o'clock: (angle_degrees, label, icon_text, callback)
         # Angles: 240° (10 o'clock), 270° (12 o'clock), 300° (11 o'clock)
@@ -920,6 +969,7 @@ class FloatingCharacter(QtWidgets.QWidget):
     def _on_prompt_click(self):
         """Handle prompt button click"""
         self._hide_circular_menu()
+        self._play_temp_gif("assets/slime-talking.gif", duration_ms=2000)
         text = self.show_question_dialog()
         if text:
             self.show_chat_message("Thinking...", duration_ms=1200)
@@ -1063,7 +1113,7 @@ class FloatingCharacter(QtWidgets.QWidget):
         # More frequent and visible randomization
         if random.random() < 0.6:
             ang = random.uniform(0, 2 * math.pi)
-            speed = random.uniform(0.7, 1.5) * MOVE_STEP
+            speed = random.uniform(0.75, 1.5) * MOVE_STEP
             self.vx = int(speed * math.cos(ang))
             self.vy = int(speed * math.sin(ang))
         # Occasionally stop or reverse
@@ -1081,7 +1131,7 @@ class FloatingCharacter(QtWidgets.QWidget):
         ny = max(geom.top(), min(ny, geom.bottom() - self.height()))
 
         self.move(nx, ny)
-
+        self._play_temp_gif("assets/slime-jump.gif", duration_ms=1250)
 
 def main():
     app = QtWidgets.QApplication([])
