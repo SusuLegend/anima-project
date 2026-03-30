@@ -229,23 +229,12 @@ class SpeechBubble(QtWidgets.QWidget):
         
         # Calculate dimensions dynamically based on message length
         message_length = len(message)
-        
-        # Adjust max dimensions based on message length
-        if message_length < 30:
-            max_bubble_width = 250
-            max_bubble_height = 120
-        elif message_length > 100:
-            max_bubble_width = 400
-            max_bubble_height = 160
-        elif message_length > 200:
-            max_bubble_width = 500
-            max_bubble_height = 220
-        else:
-            max_bubble_width = 600
-            max_bubble_height = 290
-        
-        min_bubble_width = 160
-        
+        min_bubble_width = 200   
+        RATIO = 2.07
+        BASE_WIDTH = 250
+        max_bubble_width = int(BASE_WIDTH + (message_length * 1.75))  # Base width + 7 pixels per character
+        max_bubble_height = int(max_bubble_width / RATIO)
+
         # Padding values
         horizontal_padding = 30
         vertical_padding = 20
