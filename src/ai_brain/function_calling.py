@@ -32,34 +32,35 @@ llm_tools.schema.append({
     "description": (
         "Retrieve your most recent Gmail messages, including both read and unread emails. "
         "Use this tool to check for new, recent, or unread emails, updates, notifications, or messages in your Gmail account. "
-        "You can use this tool to see if there are any updates or new messages in your inbox."
+        "Use this tool when asked for anything about emails, or gmail."
     ),
     "parameters": {}
 })
 llm_tools.schema.append({
     "name": "get_outlook",
-    "description": "Fetch unread emails from your Outlook inbox. Use this tool to check for new messages in your Outlook account.",
+    "description": "Fetch unread emails from your Outlook inbox. Use this tool to check for new messages in your Outlook account. Use this tool when asked for anything about emails, or outlook",
     "parameters": {}
 })
 llm_tools.schema.append({
     "name": "get_tasks",
-    "description": "Retrieve your Microsoft To Do tasks. Use this tool to list your pending or completed tasks from your Microsoft account.",
+    "description": "Retrieve your Microsoft To Do tasks. Use this tool to list your pending or completed tasks from your Microsoft account. Use this tool when asked for tasks.",
     "parameters": {}
 })
 llm_tools.schema.append({
     "name": "get_calendar_events",
-    "description": "Fetch upcoming events from your Microsoft Outlook calendar. Use this tool to see your scheduled meetings and events.",
+    "description": "Fetch upcoming events from your Microsoft Outlook calendar. Use this tool to see your scheduled meetings and events. Use this tool when asked about events",
     "parameters": {}
 })
 llm_tools.schema.append({
     "name": "get_whatsapp_messages",
-    "description": "Retrieve unread WhatsApp messages. Returns only new messages that have not been read yet, including sender and content. Use this tool to check for new WhatsApp notifications.",
+    "description": ("Retrieve unread WhatsApp messages. Returns only new messages that have not been read yet, including sender and content. Use this tool to check for new WhatsApp notifications"
+                    "When creating an answer, always refer by name directly (<group chat name> said <topic>, or <user name> mentioned <activity>)"),
     "parameters": {}
 })
 
 llm_tools.schema.append({
     "name": "search",
-    "description": "Search the internet for information on a given query.",
+    "description": "Search the internet for information on a given query. It is recommended to use 3 for max results and formatted results.",
     "parameters": {
         "type": "object",
         "properties": {

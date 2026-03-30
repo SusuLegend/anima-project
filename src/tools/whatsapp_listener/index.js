@@ -1,14 +1,18 @@
 import { Boom } from '@hapi/boom'
-import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
+import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers } from '@whiskeysockets/baileys'
 import qrcode from 'qrcode-terminal'
 import Pino from "pino"
 import fs from 'fs'
 
 async function startWhatsAppListener() {
     const { state, saveCreds } = await useMultiFileAuthState("auth") // saves session files
+    const { version, isLatest } = await fetchLatestBaileysVersion()
+    console.log(`[whatsapp] using WA web version ${version.join('.')} (latest=${isLatest})`)
 
     const sock = makeWASocket({
         auth: state,
+        version,
+        browser: Browsers.windows('Chrome'),
         // use info level so we can see basic events; change back to 'silent' if too noisy
         logger: Pino({ level: 'info' })
     });
